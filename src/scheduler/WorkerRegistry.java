@@ -1,0 +1,67 @@
+package scheduler;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import scheduler.Worker;
+
+public class WorkerRegistry {
+    private final Map<String, Worker> workerMap;
+
+    public WorkerRegistry(){
+        this.workerMap = new ConcurrentHashMap<>();
+    }
+
+    public Map<String, Worker> getWorkerMap(){
+        return this.workerMap;
+    }
+
+    public String getWorkerKey(String host, int port){
+        return generateKey(host, port);
+    }
+
+    public void addWorker(String host, int port, String capability){
+        String key = generateKey(host, port);
+        workerMap.compute(key, (k, existingWorker) -> {
+           long now = System.currentTimeMillis();
+           List<String> newCapabilities = new ArrayList<>();
+           if(existingWorker != null){
+               newCapabilities.addAll(existingWorker.capabilities());
+           }
+
+           if(!newCapabilities.contains(capability)){
+               newCapabilities.add(capability);
+           }
+           return new Worker(host, port, now, newCapabilities);
+        });
+    }
+
+    public Collection<Worker> getWorkers(){
+        return workerMap.values();
+    }
+
+    private String generateKey(String host, int port) {
+        return host + ":" + port;
+    }
+
+    public void updateLastSeen(String host, int port){
+        String key = generateKey(host, port);
+        Worker old = workerMap.get(key);
+        if(old != null)
+            workerMap.putIfAbsent(key, new Worker(host, port, System.currentTimeMillis(), old.capabilities()));
+    }
+
+    public void markWorkerDead(String host, int port){
+        removeWorker(host, port);
+    }
+
+    public List<Worker> getWorkersByCapability(String requiredSkill){
+        return getWorkers().stream()
+                .filter(k -> k.capabilities().contains(requiredSkill))
+                .collect(Collectors.toList());
+    }
+
+    private void removeWorker(String host, int port){
+        workerMap.remove(generateKey(host, port));
+    }
+}
