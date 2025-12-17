@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class RpcWorkerServer {
     private int port;
@@ -20,6 +21,10 @@ public class RpcWorkerServer {
     private String schedulerHost;
     private Map<String, TaskHandler> taskHanlderMap;
 
+    private static final int MAX_THREADS = 4;
+    private final ExecutorService workerPool;
+    private final AtomicInteger activeJobs;
+
     public RpcWorkerServer( int myPort, String schedulerHost, int schedulerPort, String capability){
         this.port = myPort;
         this.threadPool = Executors.newCachedThreadPool();
@@ -27,6 +32,9 @@ public class RpcWorkerServer {
         this.schedulerHost = schedulerHost;
         this.schedulerPort = schedulerPort;
         this.taskHanlderMap = new HashMap<>();
+
+        workerPool = Executors.newFixedThreadPool(MAX_THREADS);
+        activeJobs =  new AtomicInteger(0);
 
         addTaskHandler(capability);
     }
@@ -78,8 +86,35 @@ public class RpcWorkerServer {
                 return;
             }
             System.out.println("Received command: " + request);
-            String response = processCommand(request);
-            TitanProtocol.send(out, response);
+            if (request.startsWith("PING")) {
+                TitanProtocol.send(out, "PONG|" + activeJobs.get() + "|" + MAX_THREADS);
+            }
+            else if(request.startsWith("EXECUTE")){
+                if(activeJobs.get() >= MAX_THREADS){
+                    TitanProtocol.send(out, "ERROR_WORKER_SATURATED");
+                } else{
+                    activeJobs.incrementAndGet();
+                    //.get() on the future to block THIS thread until the pool thread finishes
+                    //This keeps the socket open while the work is happening
+                    workerPool.submit(() ->{
+                        try{
+                            String response = processCommand(request);
+                            synchronized (out) {
+                                try {
+                                    TitanProtocol.send(out, response);
+                                } catch (IOException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            }
+                        } catch (Exception e){
+                            System.out.println("Some Erorr happened in the workerpool executor threads");
+                            return;
+                        } finally {
+                            activeJobs.decrementAndGet();
+                        }
+                    }).get();
+                }
+            }
         } catch (IOException e){
             System.err.println("Error handling client: " + e.getMessage());
             e.printStackTrace();
@@ -110,7 +145,7 @@ public class RpcWorkerServer {
                 return "ERROR: Task doesnt exist so I dont know how to do " + taskType;
             }
         } else if(request.contains("PING")){
-            return "PONG";
+            return "PONG|" + activeJobs.get() + "|" + MAX_THREADS;
         } else {
             return "UNKNOWN_COMMAND";
         }

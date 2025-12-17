@@ -32,7 +32,7 @@ public class WorkerRegistry {
            if(!newCapabilities.contains(capability)){
                newCapabilities.add(capability);
            }
-           return new Worker(host, port, now, newCapabilities);
+           return new Worker(host, port, newCapabilities);
         });
     }
 
@@ -48,7 +48,7 @@ public class WorkerRegistry {
         String key = generateKey(host, port);
         Worker old = workerMap.get(key);
         if(old != null)
-            workerMap.putIfAbsent(key, new Worker(host, port, System.currentTimeMillis(), old.capabilities()));
+            workerMap.putIfAbsent(key, new Worker(host, port, old.capabilities()));
     }
 
     public void markWorkerDead(String host, int port){
