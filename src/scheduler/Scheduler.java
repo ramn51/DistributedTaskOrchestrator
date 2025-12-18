@@ -5,8 +5,8 @@ import network.RpcClient;
 import network.SchedulerServer;
 
 import java.io.IOException;
-import java.util.ArrayDeque;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.*;
 import java.util.concurrent.DelayQueue;
@@ -14,7 +14,8 @@ import java.util.concurrent.DelayQueue;
 public class Scheduler {
     private final WorkerRegistry workerRegistry;
     private final RpcClient schedulerClient;
-    private final Queue<Job> taskQueue;
+//    private final Queue<Job> taskQueue;
+    private final BlockingQueue<Job> taskQueue;
     private final BlockingQueue<ScheduledJob> waitingRoom;
     private final Queue<Job> deadLetterQueue;
     private final SchedulerServer schedulerServer;
@@ -25,6 +26,11 @@ public class Scheduler {
     private volatile boolean isRunning = true;
     private int port;
 
+    // This is purely for validation purpose
+    private final Map<String, Job.Status> history = new ConcurrentHashMap<>();
+
+    private final Map<String, Job> dagWaitingRoom;
+
     public Scheduler(int port){
         workerRegistry = new WorkerRegistry();
         schedulerClient = new RpcClient(workerRegistry);
@@ -32,6 +38,7 @@ public class Scheduler {
         this.taskQueue = new PriorityBlockingQueue<>();
         this.deadLetterQueue = new ConcurrentLinkedDeque<>();
         this.waitingRoom = new DelayQueue<>();
+        this.dagWaitingRoom = new ConcurrentHashMap<>();
 
         this.port = port;
         this.heartBeatExecutor = Executors.newSingleThreadScheduledExecutor();
@@ -117,7 +124,18 @@ public class Scheduler {
         }
     }
 
+    public Map<String, Job> getDAGWaitingRoom(){
+        return dagWaitingRoom;
+    }
+
     public void submitJob(Job job){
+        System.out.println("🔗 [DAG] Job " + job.getId() + " is waiting.");
+        if (!job.isReady()) {
+            System.out.println("🔗 Job " + job.getId() + " blocked by dependencies. Entering DAG Waiting Room.");
+            dagWaitingRoom.put(job.getId(), job);
+            return;
+        }
+
         long delay = job.getScheduledTime() - System.currentTimeMillis();
         if(delay <=0){
             // Run the job now (Add to the queue, dispatcher will do the polling and execution)
@@ -143,12 +161,14 @@ public class Scheduler {
         System.out.println("Running Dispatch Loop");
         while (isRunning) {
 
-                if(taskQueue.isEmpty()){
-                    Thread.sleep(1000);
-                    continue;
-                }
-                Job job = taskQueue.poll();
+//                if(taskQueue.isEmpty()){
+//                    Thread.sleep(1000);
+//                    continue;
+//                }
+                Job job = taskQueue.take();
+                System.out.println("DEBUG: Processing Job ID: " + job.getId() + " with Payload: " + job.getPayload());
                 job.setStatus(Job.Status.RUNNING);
+                history.put(job.getId(), job.getStatus());
                 System.out.println(" Job Processing: " + job);
 
                 String[] parts = job.getPayload().split("\\|", 2);
@@ -180,6 +200,7 @@ public class Scheduler {
                     System.out.println("All workers SATURATED. Re-queueing job.");
                     job.setStatus(Job.Status.PENDING);
                     taskQueue.add(job);
+                    history.put(job.getId(), job.getStatus());
                     Thread.sleep(1000);
                     continue;
                 }
@@ -195,14 +216,17 @@ public class Scheduler {
                     if (response != null && !response.startsWith("ERROR") && !response.startsWith("JOB_FAILED")) {
                         System.out.println("✅ Job Finished: " + response);
                         job.setStatus(Job.Status.COMPLETED);
+                        history.put(job.getId(), job.getStatus());
+
+                        unlockChildren(job.getId());
                     } else {
                         System.err.println("❌ Job Failed on Worker " + selectedWorker.port() + ": " + response);
                         throw new RuntimeException("Worker returned error: " + response);
                     }
                 } catch (Exception e){
                     handleJobFailure(job);
+//                    history.put(job.getId(), job.getStatus());
                 }
-
             }
         }
 
@@ -210,16 +234,71 @@ public class Scheduler {
         job.incrementRetry();
         if(job.getRetryCount() > 3) {
             job.setStatus(Job.Status.DEAD);
+            history.put(job.getId(), Job.Status.DEAD);
             System.err.println("Job Moved to DLQ (Max Retries): " + job);
             this.deadLetterQueue.offer(job);
+            cancelChildren(job.getId());
+
         } else{
             job.setStatus(Job.Status.FAILED);
             System.err.println("Job Failed. Retrying... (" + job.getRetryCount() + "/3)");
             job.setStatus(Job.Status.PENDING);
+            history.put(job.getId(), Job.Status.PENDING);
             taskQueue.offer(job);
         }
     }
 
+    private void unlockChildren(String parentId){
+        for(Job waitingJob: dagWaitingRoom.values()){
+            if(waitingJob.getDependenciesIds()!=null && waitingJob.getDependenciesIds().contains(parentId)){
+                waitingJob.resolveDependencies(parentId);
+
+                if(waitingJob.isReady()){
+                    System.out.println("🔗 DAG: All dependencies met for " + waitingJob.getId() + ". Moving to Active Queue.");
+                    dagWaitingRoom.remove(waitingJob.getId());
+                    submitJob(waitingJob);
+                }
+            }
+        }
+    }
+
+    public void cancelChildren(String failedParentId){
+        for(Job job: dagWaitingRoom.values()){
+            if(job.getDependenciesIds().contains(failedParentId)){
+                System.err.println("🚫 Cancelling Job " + job.getId() + " because parent " + failedParentId + " failed.");
+                job.setStatus(Job.Status.DEAD);
+                history.put(job.getId(), Job.Status.DEAD);
+                dagWaitingRoom.remove(job.getId());
+                this.deadLetterQueue.offer(job);
+                cancelChildren(job.getId());
+            }
+        }
+    }
+
+    public String getSystemStats() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n--- 🛰️ TITAN SYSTEM MONITOR ---\n");
+        sb.append(String.format("Active Workers:    %d\n", workerRegistry.getWorkers().size()));
+        sb.append(String.format("Execution Queue:   %d jobs\n", taskQueue.size()));
+        sb.append(String.format("Delayed (Time):    %d jobs\n", waitingRoom.size()));
+        sb.append(String.format("Blocked (DAG):     %d jobs\n", dagWaitingRoom.size()));
+        sb.append(String.format("Dead Letter (DLQ): %d jobs\n", deadLetterQueue.size()));
+        sb.append("-------------------------------\n");
+
+        // Optional: List active workers and their current load
+        if (!workerRegistry.getWorkers().isEmpty()) {
+            sb.append("Worker Status:\n");
+            for (Worker w : workerRegistry.getWorkers()) {
+                sb.append(String.format(" • [%d] Load: %d | Skill: %s\n",
+                        w.port(), w.getCurrentLoad(), w.capabilities()));
+            }
+        }
+        return sb.toString();
+    }
+
+    public Job.Status getJobStatus(String id) {
+        return history.getOrDefault(id, Job.Status.PENDING);
+    }
 
     public void stop(){
         if(isRunning){

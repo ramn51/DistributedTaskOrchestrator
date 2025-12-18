@@ -1,5 +1,6 @@
 package network;
 
+import scheduler.Job;
 import scheduler.Scheduler;
 import scheduler.WorkerRegistry;
 
@@ -8,6 +9,9 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -79,12 +83,34 @@ public class SchedulerServer {
         }
     }
 
+    private void parseAndSubmitDAG(String request){
+        String [] jobs = request.split(";");
+        for(String jobDef: jobs){
+            try {
+                Job job = Job.fromDagString(jobDef.trim());
+                System.out.println("🚀 [PARSER] Created Job: " + job.getId());
+                scheduler.submitJob(job);
+            } catch (Exception e) {
+                System.err.println("❌ Failed to parse DAG job: " + jobDef + " Error: " + e.getMessage());
+            }
+        }
+    }
+
     private String processCommand(String request){
-        if(request.startsWith("SUBMIT")){
+        if (request.equalsIgnoreCase("STATS")) {
+            return scheduler.getSystemStats();
+        }
+
+        if (request.startsWith("SUBMIT_DAG")){
+            parseAndSubmitDAG(request.substring(10).trim());
+            return "DAG_ACCEPTED";
+        }
+        else if(request.startsWith("SUBMIT")){
             String jobPayload = request.substring(7).trim();
             scheduler.submitJob(jobPayload);
             return "JOB_ACCEPTED";
-        } else if (request.contains("SUSPEND")) {
+        }
+        else if (request.contains("SUSPEND")) {
             return "SUSPEND_JOB";
         } else{
             return "UNKNOWN_COMMAND";

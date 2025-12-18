@@ -134,6 +134,19 @@ public class RpcWorkerServer {
             String taskType = parts[0];
             String payload = parts[1];
 
+            if (payload.contains("SLEEP")) {
+                try { Thread.sleep(5000); } catch (Exception e) {}
+            }
+
+            if (taskType.equals("TEST")) {
+                return "SUCCESS_PROCESSED_" + payload;
+            }
+
+            if (payload.contains("FAIL")) {
+                return "JOB_FAILED_SIMULATED_ERROR";
+            }
+
+
             TaskHandler handler = taskHanlderMap.get(taskType);
             if(handler!=null){
                 try{
