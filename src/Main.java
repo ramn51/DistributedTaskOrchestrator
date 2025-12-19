@@ -1,15 +1,52 @@
+import network.RpcWorkerServer;
+import scheduler.Scheduler;
+
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 public class Main {
     public static void main(String[] args) {
-        //TIP Press <shortcut actionId="ShowIntentionActions"/> with your caret at the highlighted text
-        // to see how IntelliJ IDEA suggests fixing it.
-        System.out.printf("Hello and welcome!");
-
-        for (int i = 1; i <= 5; i++) {
-            //TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-            // for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
-            System.out.println("i = " + i);
+        if (args.length == 0) {
+            printUsage();
+            return;
         }
+
+        String mode = args[0].toUpperCase();
+
+        try {
+            switch (mode) {
+                case "SCHEDULER":
+                    int schedPort = (args.length > 1) ? Integer.parseInt(args[1]) : 9090;
+                    System.out.println("🚀 Starting Titan Scheduler on port " + schedPort);
+                    Scheduler scheduler = new Scheduler(schedPort);
+                    scheduler.start();
+                    break;
+
+                case "WORKER":
+                    // Usage: WORKER <MY_PORT> <SCHEDULER_HOST> <SCHEDULER_PORT> <CAPABILITY>
+                    int myPort = (args.length > 1) ? Integer.parseInt(args[1]) : 8081;
+                    String sHost = (args.length > 2) ? args[2] : "localhost";
+                    int sPort = (args.length > 3) ? Integer.parseInt(args[3]) : 9090;
+                    String cap = (args.length > 4) ? args[4] : "GENERAL";
+
+                    System.out.println("👷 Starting Titan Worker on port " + myPort);
+                    RpcWorkerServer worker = new RpcWorkerServer(myPort, sHost, sPort, cap);
+                    worker.start();
+                    break;
+
+                default:
+                    System.out.println("Unknown mode: " + mode);
+                    printUsage();
+                    break;
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Critical failure during startup:");
+            e.printStackTrace();
+        }
+    }
+
+    private static void printUsage() {
+        System.out.println("Usage:");
+        System.out.println("  java -jar Titan.jar SCHEDULER [port]");
+        System.out.println("  java -jar Titan.jar WORKER [myPort] [schedHost] [schedPort] [capability]");
     }
 }

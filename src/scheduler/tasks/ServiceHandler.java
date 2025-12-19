@@ -1,5 +1,7 @@
 package scheduler.tasks;
 
+import network.RpcWorkerServer;
+import network.TitanProtocol;
 import scheduler.TaskHandler;
 
 import java.io.File;
@@ -13,41 +15,62 @@ public class ServiceHandler implements TaskHandler {
     private static final String WORKSPACE_DIR = "./titan_workspace/";
     private final String operation;
 
-    public ServiceHandler(String op){
+    private final RpcWorkerServer parentServer;
+
+    public ServiceHandler(String op, RpcWorkerServer parentServer){
         this.operation = op;
+        this.parentServer = parentServer;
     }
 
     @Override
     public String execute(String payload) {
         String [] parts = payload.split("\\|");
-        String fileName = parts[0];
-        String serviceId = (parts.length > 1) ? parts[1] : "svc_" + System.currentTimeMillis();
 
         if(operation.equals("START")){
-            return startProcess(fileName, serviceId);
+            String fileName = parts[0];
+            String serviceId = (parts.length > 1) ? parts[1] : "svc_" + System.currentTimeMillis();
+            String portToUse = (parts.length > 2) ? parts[2] : "8085";
+
+            return startProcess(fileName, serviceId, portToUse);
         } else {
-            return stopProcess(payload);
+            String idToKill = (parts.length > 1) ? parts[1] : parts[0];
+            return stopProcess(idToKill);
         }
     }
 
-    private String startProcess(String fileName, String serviceId){
+    private String startProcess(String fileName, String serviceId, String port){
         // Payload: "filename|service_id"
         File scriptFile = new File(WORKSPACE_DIR, fileName);
 
         if(!scriptFile.exists()){
             return "ERROR: File not found at " + scriptFile.getAbsolutePath();
         }
-        return launchDetachedProcess(serviceId, "python", scriptFile.getAbsolutePath());
+
+        if (fileName.endsWith(".jar")) {
+            String javaHome = System.getProperty("java.home");
+            String javaBin = javaHome + File.separator + "bin" + File.separator + "java";
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                javaBin += ".exe";
+            }
+
+            System.out.println("JAVA RUNTIME ::::" + javaBin);
+            // To run a jar: java -jar <path>
+            return launchDetachedProcess(serviceId, javaBin, "-jar", scriptFile.getAbsolutePath(), port);
+        } else if (fileName.endsWith(".py")) {
+            return launchDetachedProcess(serviceId, "python", scriptFile.getAbsolutePath());
+        } else {
+            // Default to trying to execute it directly (e.g. binaries or .sh)
+            return launchDetachedProcess(serviceId, scriptFile.getAbsolutePath());
+        }
     }
 
-    private String launchDetachedProcess(String serviceId, String command, String scriptPath) {
+    private String launchDetachedProcess(String serviceId, String... command) {
         if (runningServices.containsKey(serviceId)) {
             return "SERVICE_ALREADY_RUNNING: " + serviceId;
         }
 
         try {
-
-            ProcessBuilder pb = new ProcessBuilder(command, scriptPath);
+            ProcessBuilder pb = new ProcessBuilder(command);
 
             // 2. Separate Logs (Crucial for debugging background jobs)
             File logFile = new File(WORKSPACE_DIR, serviceId + ".log");
@@ -64,6 +87,7 @@ public class ServiceHandler implements TaskHandler {
             process.onExit().thenRun(() -> {
                 runningServices.remove(serviceId);
                 System.out.println("🛑 Service Stopped: " + serviceId);
+                parentServer.notifyMasterOfServiceStop(serviceId);
             });
 
             return "DEPLOYED_SUCCESS | ID: " + serviceId + " | PID: " + process.pid();

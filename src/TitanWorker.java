@@ -2,10 +2,10 @@ import network.RpcWorkerServer;
 
 public class TitanWorker {
     public static void main(String[] args) {
-        // Start Worker on port 8080, connect to Scheduler on 9090
-        // Skill: TEST
+        int myPort = (args.length > 0) ? Integer.parseInt(args[0]) : 8080;
         try {
-            RpcWorkerServer worker = new RpcWorkerServer(8080, "localhost", 9090, "TEST");
+            // Change "TEST" to "GENERAL"
+            RpcWorkerServer worker = new RpcWorkerServer(myPort, "localhost", 9090, "GENERAL");
             worker.start();
         } catch (Exception e) {
             e.printStackTrace();

@@ -29,3 +29,5 @@ bin/
 ### Mac OS ###
 .DS_Store
 .idea
+
+titan_workspace/*

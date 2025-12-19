@@ -5,11 +5,18 @@ import network.RpcClient;
 import network.SchedulerServer;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.*;
 import java.util.concurrent.DelayQueue;
+
+class ServiceInfo {
+    Worker hostWorker;
+    long startTime;
+    String status; // "STARTING", "RUNNING", "FAILED"
+}
 
 public class Scheduler {
     private final WorkerRegistry workerRegistry;
@@ -28,6 +35,7 @@ public class Scheduler {
 
     // This is purely for validation purpose
     private final Map<String, Job.Status> history = new ConcurrentHashMap<>();
+    private final Map<String, Worker> liveServiceMap = new ConcurrentHashMap<>();
 
     private final Map<String, Job> dagWaitingRoom;
 
@@ -124,6 +132,28 @@ public class Scheduler {
         }
     }
 
+    public Map<String, Worker> getLiveServiceMap(){
+        return liveServiceMap;
+    }
+
+    public synchronized void registerWorker(String host, int port, String capability) {
+        this.workerRegistry.addWorker(host, port, capability);
+
+        // We only remove from liveServiceMap if the ID starts with "WRK"
+        // AND matches the port that just checked in.
+        liveServiceMap.entrySet().removeIf(entry -> {
+            String id = entry.getKey();
+            boolean isWorker = id.startsWith("WRK-");
+            boolean matchesPort = id.contains("-" + port + "-");
+
+            if (isWorker && matchesPort) {
+                System.out.println("🚀 Promoting Infrastructure: " + id + " is now a Peer Worker.");
+                return true; // Removes it from the "under some worker" list
+            }
+            return false;
+        });
+    }
+
     public Map<String, Job> getDAGWaitingRoom(){
         return dagWaitingRoom;
     }
@@ -166,7 +196,7 @@ public class Scheduler {
 //                    continue;
 //                }
                 Job job = taskQueue.take();
-                System.out.println("DEBUG: Processing Job ID: " + job.getId() + " with Payload: " + job.getPayload());
+                System.out.println("DEBUG: Processing Job ID: " + job.getId());
                 job.setStatus(Job.Status.RUNNING);
                 history.put(job.getId(), job.getStatus());
                 System.out.println(" Job Processing: " + job);
@@ -213,25 +243,12 @@ public class Scheduler {
                 System.out.println("🚀 Dispatching " + job.getPayload() + " to Worker " + selectedWorker.port());
 
                 try{
-//                    String response = schedulerClient.sendRequest(selectedWorker.host(), selectedWorker.port(),
-//                            "EXECUTE " + job.getPayload());
-
                         String response = executeJobRequest(job, selectedWorker);
                         System.out.println("✅ Job Finished: " + response);
                         job.setStatus(Job.Status.COMPLETED);
                         history.put(job.getId(), job.getStatus());
                         unlockChildren(job.getId());
 
-//                    if (response != null && !response.startsWith("ERROR") && !response.startsWith("JOB_FAILED")) {
-//                        System.out.println("✅ Job Finished: " + response);
-//                        job.setStatus(Job.Status.COMPLETED);
-//                        history.put(job.getId(), job.getStatus());
-//
-//                        unlockChildren(job.getId());
-//                    } else {
-//                        System.err.println("❌ Job Failed on Worker " + selectedWorker.port() + ": " + response);
-//                        throw new RuntimeException("Worker returned error: " + response);
-//                    }
                 } catch (Exception e){
                     handleJobFailure(job);
 //                    history.put(job.getId(), job.getStatus());
@@ -273,9 +290,14 @@ public class Scheduler {
     }
 
     private String executeDeploySequence(Job job, Worker worker) throws Exception {
-        String[] parts = job.getPayload().split("\\|", 3);
+        String[] parts = job.getPayload().split("\\|", 4);
         String filename = parts[1];
         String base64Script = parts[2];
+
+        System.out.println("SCHEDULER LOGS::ARGS PASSED TO DEPLOY EXEC " + parts.length);
+
+        // This will be passed only for the jar based deployment and not for python ones.
+        String optionalPort = (parts.length > 3) ? parts[3] : "8085";
 
         // Step 1: Stage
         String stageResp = sendExecuteCommand(worker, "STAGE_FILE|" + filename + "|" + base64Script);
@@ -285,12 +307,13 @@ public class Scheduler {
         System.out.println("✅ File Staged");
 
         // Step 2: Start
-        String startResp = sendExecuteCommand(worker, "START_SERVICE|" + filename + "|" + job.getId());
+        String startResp = sendExecuteCommand(worker, "START_SERVICE|" + filename + "|" + job.getId()+ "|" + optionalPort);
         if (!startResp.contains("DEPLOYED_SUCCESS")) {
             throw new RuntimeException("Start failed. Expected DEPLOYED_SUCCESS, got: " + startResp);
         }
 
         String pid = startResp.contains("PID:") ? startResp.split("PID:")[1].trim() : "UNKNOWN";
+        liveServiceMap.put(job.getId(), worker);
         return "DEPLOYED_SUCCESS PID:" + pid;
     }
 
@@ -327,6 +350,24 @@ public class Scheduler {
             throw new RuntimeException("Worker Error: " + response);
         }
         return response;
+    }
+
+    public String stopRemoteService(String serviceId) {
+        Worker targetWorker = liveServiceMap.get(serviceId);
+
+        if (targetWorker == null) {
+            return "ERROR: Service " + serviceId + " not found.";
+        }
+
+        try {
+            String response = sendExecuteCommand(targetWorker, "STOP_SERVICE|" + serviceId);
+            if (response.contains("SUCCESS") || response.contains("STOPPED")) {
+                liveServiceMap.remove(serviceId);
+            }
+            return response;
+        } catch (Exception e) {
+            return "COMMUNICATION_ERROR: " + e.getMessage();
+        }
     }
 
     private void unlockChildren(String parentId){
@@ -370,11 +411,72 @@ public class Scheduler {
         if (!workerRegistry.getWorkers().isEmpty()) {
             sb.append("Worker Status:\n");
             for (Worker w : workerRegistry.getWorkers()) {
-                sb.append(String.format(" • [%d] Load: %d | Skill: %s\n",
-                        w.port(), w.getCurrentLoad(), w.capabilities()));
+                int current = w.getCurrentLoad();
+                int max = 4; // Assuming your MAX_THREADS is 4, adjust as needed
+                String loadStr = String.format("%d/%d (%d%%)", current, max, (current * 100 / max));
+
+                sb.append(String.format(" • [%d] Load: %-12s | Skills: %s\n",
+                        w.port(), loadStr, w.capabilities()));
+
+                liveServiceMap.entrySet().stream()
+                        .filter(entry -> entry.getValue().equals(w))
+                        .forEach(entry -> {
+                            String serviceId = entry.getKey();
+                            // Optional: If you want to hide Child Workers from this list
+                            // and only show them as main entries:
+                            // if (serviceId.contains("worker")) return;
+
+                            sb.append(String.format("    └── ⚙️ Service ID: %s\n", serviceId));
+                        });
             }
+        } else{
+            sb.append("⚠️ No workers currently connected.\n");
         }
         return sb.toString();
+    }
+
+    public String getSystemStatsJSON() {
+        StringBuilder json = new StringBuilder();
+        json.append("{");
+        json.append("\"active_workers\": ").append(workerRegistry.getWorkers().size()).append(",");
+        json.append("\"queue_size\": ").append(taskQueue.size()).append(",");
+        json.append("\"workers\": [");
+
+        // Get the collection from your registry
+        java.util.Collection<Worker> workers = workerRegistry.getWorkers();
+        int workerCount = 0;
+        int totalWorkers = workers.size();
+
+        for (Worker w : workers) {
+            json.append("{");
+            json.append("\"port\": ").append(w.port()).append(",");
+            json.append("\"load\": \"").append(w.getCurrentLoad()).append("/4\",");
+            json.append("\"services\": [");
+
+            // Filter liveServiceMap for keys (Service IDs) belonging to this worker
+            java.util.List<String> services = liveServiceMap.entrySet().stream()
+                    .filter(entry -> entry.getValue().equals(w))
+                    .map(java.util.Map.Entry::getKey)
+                    .toList();
+
+            for (int j = 0; j < services.size(); j++) {
+                json.append("\"").append(services.get(j)).append("\"");
+                if (j < services.size() - 1) {
+                    json.append(",");
+                }
+            }
+
+            json.append("]}");
+
+            // Add comma between worker objects, but not after the last one
+            workerCount++;
+            if (workerCount < totalWorkers) {
+                json.append(",");
+            }
+        }
+
+        json.append("]}");
+        return json.toString();
     }
 
     public Job.Status getJobStatus(String id) {

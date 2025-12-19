@@ -58,7 +58,8 @@ public class SchedulerServer {
             String host = socket.getInetAddress().getHostAddress();
 
             System.out.println("➕ Registering Worker: " + host + " with " + capability);
-            scheduler.getWorkerRegistry().addWorker(host, workerPort, capability);
+            scheduler.registerWorker(host, workerPort, capability);
+//            scheduler.getWorkerRegistry().addWorker(host, workerPort, capability);
             return ("REGISTERED");
     }
 
@@ -88,7 +89,7 @@ public class SchedulerServer {
         }
     }
 
-    private String handleDeployRequest(String fileName) {
+    private String handleDeployRequest(String fileName, String port) {
         try {
             File file = new File(PERM_FILES_DIR + File.separator + fileName);
             if (!file.exists()) {
@@ -98,10 +99,21 @@ public class SchedulerServer {
             byte[] fileBytes = Files.readAllBytes(file.toPath());
             String base64Content = Base64.getEncoder().encodeToString(fileBytes);
 
+            Job job = new Job("TEMP_PAYLOAD", 1, 0);
+            String internalId = job.getId();
+
+            // If it's a Worker, we include the port in the ID for easy matching later
+            String taggedId = (fileName.equalsIgnoreCase("Worker.jar"))
+                    ? "WRK-" + port + "-" + internalId
+                    : "TSK-" + internalId;
+
+            // 3. Update the Job with the tagged ID and final payload
+            job.setId(taggedId);
+
             // 2. Construct a Payload that contains EVERYTHING the worker needs
             // Format: DEPLOY_PAYLOAD|filename|base64data
-            String payload = "DEPLOY_PAYLOAD|" + fileName + "|" + base64Content;
-            Job job = new Job(payload, 1, 0);
+            String payload = "DEPLOY_PAYLOAD|" + fileName + "|" + base64Content + "|" + port;
+            job.setPayload(payload);
             scheduler.submitJob(job);
 
             System.out.println("📦 [DEPLOY] Job queued for file: " + fileName);
@@ -154,16 +166,16 @@ public class SchedulerServer {
     }
 
 
-
-
     private String processCommand(String request){
         if (request.startsWith("DEPLOY")) {
-            // Expected format: DEPLOY|server.py
             String[] parts = request.split("\\|");
             if (parts.length < 2) return "ERROR: Missing filename";
 
             String fileName = parts[1];
-            return handleDeployRequest(fileName);
+            // Capture the port if provided, otherwise null/empty
+            String port = (parts.length > 2) ? parts[2] : "";
+
+            return handleDeployRequest(fileName, port);
         }
 
         if (request.startsWith("RUN")) {
@@ -173,6 +185,36 @@ public class SchedulerServer {
             String filename = parts[1];
 
             return handleRunScript(filename);
+        }
+
+        // Add this block inside processCommand method
+        if (request.startsWith("UNREGISTER_SERVICE")) {
+            String[] parts = request.split("\\|");
+            if (parts.length > 1) {
+                String serviceId = parts[1];
+                // Remove the service from the map
+                scheduler.getLiveServiceMap().remove(serviceId);
+                System.out.println("🧹 Cleaned up service record for: " + serviceId);
+                return "ACK_UNREGISTERED";
+            }
+        }
+
+        if (request.equalsIgnoreCase("STATS_JSON")) {
+            System.out.println("📊 Generating JSON Stats...");
+            return scheduler.getSystemStatsJSON();
+        }
+
+        if (request.equalsIgnoreCase("CLEAN_STATS")) {
+            scheduler.getLiveServiceMap().clear();
+            return "Stats Map Cleared. Run STATS again to see fresh state.";
+        }
+
+        if (request.startsWith("STOP")) {
+            String[] parts = request.split("\\|");
+            if (parts.length < 2) return "ERROR: Missing Service ID";
+
+            // Just call the clean public API
+            return scheduler.stopRemoteService(parts[1]);
         }
 
         if (request.equalsIgnoreCase("STATS")) {

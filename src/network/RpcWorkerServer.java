@@ -46,12 +46,13 @@ public class RpcWorkerServer {
     public void addTaskHandler(){
         taskHanlderMap.put("PDF_CONVERT", new PdfConversionHandler());
         taskHanlderMap.put("STAGE_FILE", new FileHandler());
-        taskHanlderMap.put("START_SERVICE", new ServiceHandler("START"));
-        taskHanlderMap.put("STOP_SERVICE", new ServiceHandler("STOP"));
+        taskHanlderMap.put("START_SERVICE", new ServiceHandler("START", this));
+        taskHanlderMap.put("STOP_SERVICE", new ServiceHandler("STOP", this));
         taskHanlderMap.put("RUN_SCRIPT", new ScriptExecutorHandler());
     }
 
     public void start() throws Exception {
+        System.out.println("DEBUG: Attempting to bind to port: " + this.port);
         registerWithScheduler();
         try(ServerSocket serverSocket = new ServerSocket(port)){
             System.out.println("Worker Server started on port " + port);
@@ -91,7 +92,7 @@ public class RpcWorkerServer {
             if (request == null) {
                 return;
             }
-            System.out.println("Received command: " + request);
+//            System.out.println("Received command: " + request);
             if (request.startsWith("PING")) {
                 TitanProtocol.send(out, "PONG|" + activeJobs.get() + "|" + MAX_THREADS);
             }
@@ -129,6 +130,21 @@ public class RpcWorkerServer {
         }
     }
 
+    public void notifyMasterOfServiceStop(String serviceId) {
+        // masterHost and masterPort should be variables in your RpcWorkerServer class
+        try (Socket socket = new Socket(this.schedulerHost, this.schedulerPort);
+             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+             DataInputStream in = new DataInputStream(socket.getInputStream())) {
+
+            String message = "UNREGISTER_SERVICE|" + serviceId;
+            TitanProtocol.send(out, message);
+            System.out.println("[TitanProtocol] Sent UNREGISTER_SERVICE for " + serviceId);
+
+        } catch (IOException e) {
+            System.err.println("❌ Failed to notify Master: " + e.getMessage());
+        }
+    }
+
     private String processCommand(String request){
         if(request.startsWith("EXECUTE")){
             // The request will be of the form EXECUTE PDF_CONVERT|fileName.docx
@@ -152,7 +168,6 @@ public class RpcWorkerServer {
                 return "JOB_FAILED_SIMULATED_ERROR";
             }
 
-
             TaskHandler handler = taskHanlderMap.get(taskType);
             if(handler!=null){
                 try{
@@ -175,8 +190,39 @@ public class RpcWorkerServer {
         threadPool.shutdown();
     }
 
-    public static void main(String args[]) throws Exception{
-        RpcWorkerServer rpcWorkerServer = new RpcWorkerServer(8080, "localhost", 9090, "GENERAL");
+    public static void main(String[] args) throws Exception {
+        int myPort = 8080;
+        String schedHost = "localhost";
+        int schedPort = 9090;
+        String capability = "GENERAL";
+
+        // 2. Parse Arguments (Order: port, schedHost, schedPort, capability)
+        if (args.length > 0) {
+            try {
+                myPort = Integer.parseInt(args[0]);
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid port provided, using default 8080");
+            }
+        }
+
+        if (args.length > 1) schedHost = args[1];
+
+        if (args.length > 2) {
+            try {
+                schedPort = Integer.parseInt(args[2]);
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid scheduler port, using default 9090");
+            }
+        }
+
+        if (args.length > 3) capability = args[3];
+
+        System.out.println("Starting Worker Server...");
+        System.out.println("Local Port: " + myPort);
+        System.out.println("Target Scheduler: " + schedHost + ":" + schedPort);
+        System.out.println("Capability: " + capability);
+
+        RpcWorkerServer rpcWorkerServer = new RpcWorkerServer(myPort, schedHost, schedPort, capability);
         rpcWorkerServer.start();
     }
 }
