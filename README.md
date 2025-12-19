@@ -53,6 +53,7 @@ Titan uses a strictly defined directory structure to manage payload distribution
 ```bash
 git clone [https://github.com/yourusername/titan-orchestrator.git](https://github.com/yourusername/titan-orchestrator.git)
 javac -d bin src/**/*.java
+```
 
 
 ## Quick Start (Local)
@@ -212,5 +213,5 @@ python3 dashboard.py
 
 ---
 
-**Author:** Ram Narayanan Ananthakrishnapuram Sampath
+**Author:** Ram Narayanan A S
 *Built to understand the "Hard Parts" of Distributed Systems.*
