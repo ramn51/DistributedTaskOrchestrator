@@ -27,6 +27,7 @@ It doesn't just run your code; it intelligently expands the cluster infrastructu
 * **Custom TCP Protocol:** Efficient, binary-packed communication layer (`TITAN_PROTOCOL`) with "Smart Parsing" for variable-length payloads.
 * **Real-time Dashboard:** A Flask-based (Python) UI for visualizing cluster health, load, and active services.
 
+
 ## 🛠️ Architecture
 
 The system follows a classic **Master-Slave (Leader-Follower)** architecture:
@@ -112,12 +113,14 @@ The easiest way to run a full cluster (1 Scheduler + 3 Workers) is using Docker 
 
 ```yaml
 version: '3.8'
+
 services:
   titan-scheduler:
     build: .
     command: ["java", "-cp", "out/production/DistributedOrchestrator", "scheduler.TitanMaster"]
     ports:
       - "9090:9090"
+
   worker-1:
     build: .
     command: ["java", "-cp", "out/production/DistributedOrchestrator", "network.TitanWorker"]
