@@ -2,9 +2,19 @@
 
 # 🛰️ Titan: A Distributed Job Orchestrator
 
-**Titan** is a lightweight, fault-tolerant distributed job scheduler built from scratch in **Java**. It simulates core concepts found in enterprise systems like Kubernetes and Apache Airflow, including dependency resolution (DAGs), dynamic scaling, and custom binary protocols.
+**Titan** is a **hybrid infrastructure** and **workload orchestrator** built from scratch in Java.
+
+Unlike traditional job schedulers that merely execute tasks on static hardware, Titan functions as a **self-provisioning platform**. It blends the workload management capabilities of tools like Apache Airflow (DAGs, dependencies) with the node orchestration capabilities of Kubernetes (dynamic scaling, self-replication).
+
+It doesn't just run your code; it intelligently expands the cluster infrastructure to meet the demands of your code.
 
 ## 🚀 Key Features
+
+** Dual-Layer Orchestration**:
+
+* **Workload Layer**: Manages complex job dependencies, retries, and scheduling priorities.
+
+* **Infrastructure Layer**: Workers act as infrastructure agents, capable of spawning new nodes (containers/processes) on demand to handle burst loads.
 
 * **DAG Execution Engine:** Supports complex dependency chains (e.g., *Task A → Task B & C → Task D*). It handles "Waiting Rooms" for blocked jobs and executes them automatically when dependencies resolve.
 * **Recursive Scaling ("Inception"):** A unique capability where Workers have the intelligence to spawn *new* Worker nodes dynamically based on workload instructions.
