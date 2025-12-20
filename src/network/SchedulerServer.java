@@ -36,11 +36,11 @@ public class SchedulerServer {
 
     public void start(){
         try(serverSocket){
-            System.out.println("✅ SchedulerServer Listening on port " + port);
+            System.out.println("[OK] SchedulerServer Listening on port " + port);
             while(isRunning){
                 try{
                     Socket clientSocket = serverSocket.accept();
-                    System.out.println("⚡ Incoming connection from " + clientSocket.getInetAddress());
+                    System.out.println("Incoming connection from " + clientSocket.getInetAddress());
                     threadPool.submit(() -> clientHandler(clientSocket));
                 } catch (IOException e){
                     e.printStackTrace();
@@ -57,7 +57,7 @@ public class SchedulerServer {
             int workerPort = Integer.parseInt(parts[1]);
             String host = socket.getInetAddress().getHostAddress();
 
-            System.out.println("➕ Registering Worker: " + host + " with " + capability);
+            System.out.println("Registering Worker: " + host + " with " + capability);
             scheduler.registerWorker(host, workerPort, capability);
 //            scheduler.getWorkerRegistry().addWorker(host, workerPort, capability);
             return ("REGISTERED");
@@ -116,7 +116,7 @@ public class SchedulerServer {
             job.setPayload(payload);
             scheduler.submitJob(job);
 
-            System.out.println("📦 [DEPLOY] Job queued for file: " + fileName);
+            System.out.println("[DEPLOY] Job queued for file: " + fileName);
             return "DEPLOY_QUEUED";
 
         } catch (IOException e) {
@@ -157,10 +157,10 @@ public class SchedulerServer {
         for(String jobDef: jobs){
             try {
                 Job job = Job.fromDagString(jobDef.trim());
-                System.out.println("🚀 [PARSER] Created Job: " + job.getId());
+                System.out.println("[INFO] [PARSER] Created Job: " + job.getId());
                 scheduler.submitJob(job);
             } catch (Exception e) {
-                System.err.println("❌ Failed to parse DAG job: " + jobDef + " Error: " + e.getMessage());
+                System.err.println("[FAIL] Failed to parse DAG job: " + jobDef + " Error: " + e.getMessage());
             }
         }
     }
@@ -194,13 +194,13 @@ public class SchedulerServer {
                 String serviceId = parts[1];
                 // Remove the service from the map
                 scheduler.getLiveServiceMap().remove(serviceId);
-                System.out.println("🧹 Cleaned up service record for: " + serviceId);
+                System.out.println("[INFO] Cleaned up service record for: " + serviceId);
                 return "ACK_UNREGISTERED";
             }
         }
 
         if (request.equalsIgnoreCase("STATS_JSON")) {
-            System.out.println("📊 Generating JSON Stats...");
+            System.out.println("[INFO] Generating JSON Stats...");
             return scheduler.getSystemStatsJSON();
         }
 

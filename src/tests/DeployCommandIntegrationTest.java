@@ -69,7 +69,7 @@ public class DeployCommandIntegrationTest {
             runTestScenario();
         } catch (Exception e) {
             e.printStackTrace();
-            System.err.println("❌ TEST FAILED");
+            System.err.println("[FAIL] TEST FAILED");
             System.exit(1);
         } finally {
             System.out.println("🛑 Test Complete. Shutting down.");
@@ -101,7 +101,7 @@ public class DeployCommandIntegrationTest {
 
             Path filePath = Paths.get("perm_files", "deploy_test_svc.py");
             Files.write(filePath, pythonScript.getBytes(StandardCharsets.UTF_8));
-            System.out.println("✅ Created test file: " + filePath.toAbsolutePath());
+            System.out.println("[OK] Created test file: " + filePath.toAbsolutePath());
 
         } catch (IOException e) {
             throw new RuntimeException("Failed to setup perm_files", e);
@@ -126,7 +126,7 @@ public class DeployCommandIntegrationTest {
             throw new RuntimeException("Scheduler rejected deployment: " + response);
         }
 
-        System.out.println("✅ Deployment Queued. Waiting for Worker Execution...");
+        System.out.println("[OK] Deployment Queued. Waiting for Worker Execution...");
 
         // 2. VERIFY DEPLOYMENT (UDP)
         // We wait a bit longer here because:
@@ -135,7 +135,7 @@ public class DeployCommandIntegrationTest {
 
         String testPayload = "HELLO_FROM_TEST_CLIENT";
         verifyUdp(testPayload);
-        System.out.println("✅ UDP Verification Passed - Code is running remotely!");
+        System.out.println("[OK] UDP Verification Passed - Code is running remotely!");
     }
 
     // --- REPLACEMENT FOR sendCommand using TitanProtocol ---
@@ -169,7 +169,7 @@ public class DeployCommandIntegrationTest {
             String reply = new String(dp.getData(), 0, dp.getLength());
             if (!reply.equals("PONG_DEPLOYED")) throw new RuntimeException("Wrong UDP Reply: " + reply);
 
-            System.out.println("✅ Received UDP Reply: '" + reply + "'");
+            System.out.println("[OK] Received UDP Reply: '" + reply + "'");
         }
     }
 }

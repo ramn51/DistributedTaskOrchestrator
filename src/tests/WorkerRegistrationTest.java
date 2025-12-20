@@ -33,9 +33,9 @@ public class WorkerRegistrationTest {
                 .anyMatch(w -> w.port() == 8080 && w.capabilities().contains("PDF_CONVERT"));
 
         if (isRegistered) {
-            System.out.println("✅ TEST 1 PASSED: Worker Registered!");
+            System.out.println("[OK] TEST 1 PASSED: Worker Registered!");
         } else {
-            System.err.println("❌ TEST 1 FAILED: Worker not found in registry.");
+            System.err.println("[FAIL] TEST 1 FAILED: Worker not found in registry.");
         }
 
         // 4. VERIFY JOB SUBMISSION (Client Side)
@@ -47,9 +47,9 @@ public class WorkerRegistrationTest {
             String resp = TitanProtocol.read(in);
 
             if ("JOB_ACCEPTED".equals(resp)) {
-                System.out.println("✅ TEST 2 PASSED: Job Accepted!");
+                System.out.println("[OK] TEST 2 PASSED: Job Accepted!");
             } else {
-                System.err.println("❌ TEST 2 FAILED: " + resp);
+                System.err.println("[FAIL] TEST 2 FAILED: " + resp);
             }
         }
 

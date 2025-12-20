@@ -157,7 +157,7 @@ public class Job implements Comparable<Job> {
                 byte[] fileBytes = java.nio.file.Files.readAllBytes(file.toPath());
                 base64Content = java.util.Base64.getEncoder().encodeToString(fileBytes);
             } else {
-                System.err.println("⚠️ Warning: File not found: " + filename);
+                System.err.println("[ERROR] Warning: File not found: " + filename);
                 // Fallback: send without base64, though worker might fail
                 return type + "|" + filename;
             }
@@ -168,7 +168,7 @@ public class Job implements Comparable<Job> {
                 return "DEPLOY_PAYLOAD|" + filename + "|" + base64Content + "|" + port;
             }
         } catch (Exception e) {
-            System.err.println("❌ Payload Error: " + e.getMessage());
+            System.err.println("[FAIL] Payload Error: " + e.getMessage());
             return type + "|" + filename;
         }
     }

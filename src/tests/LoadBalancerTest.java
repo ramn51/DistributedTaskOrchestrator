@@ -17,7 +17,7 @@ public class LoadBalancerTest {
         Thread.sleep(1000);
 
         // 2. Start TWO Workers
-        System.out.println("🚀 Starting Worker A (8080) and Worker B (8081)...");
+        System.out.println("[INFO] Starting Worker A (8080) and Worker B (8081)...");
         RpcWorkerServer workerA = new RpcWorkerServer(8080, "localhost", 9090, "PDF_CONVERT");
         RpcWorkerServer workerB = new RpcWorkerServer(8081, "localhost", 9090, "PDF_CONVERT");
 

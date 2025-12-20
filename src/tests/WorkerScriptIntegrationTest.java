@@ -59,7 +59,7 @@ public class WorkerScriptIntegrationTest {
                 "import socket, sys\n" +
                         "sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)\n" +
 
-                        // 🔥 NEW LINE: Allow port reuse to prevent WinError 10048
+                        // NEW LINE: Allow port reuse to prevent WinError 10048
                         "sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)\n" +
 
                         "sock.bind(('0.0.0.0', " + UDP_PORT + "))\n" +
@@ -77,25 +77,25 @@ public class WorkerScriptIntegrationTest {
         // 1. STAGE
         String resp = sendCommand("EXECUTE STAGE_FILE|" + filename + "|" + base64Script);
         if (!resp.contains("FILE_SAVED")) throw new RuntimeException("Staging Failed: " + resp);
-        System.out.println("✅ File Staged");
+        System.out.println("[OK] File Staged");
 
         // 2. START
         resp = sendCommand("EXECUTE START_SERVICE|" + filename + "|" + serviceId);
         if (!resp.contains("DEPLOYED_SUCCESS")) throw new RuntimeException("Start Failed: " + resp);
-        System.out.println("✅ Service Started (PID: " + resp.split("PID: ")[1] + ")");
+        System.out.println("[OK] Service Started (PID: " + resp.split("PID: ")[1] + ")");
 
         // 3. VERIFY (UDP)
         Thread.sleep(1000);
         String testPayload = "TEST_PAYLOAD_XYZ";// Wait for Python
         verifyUdp(testPayload);
-        System.out.println("✅ UDP Verification Passed");
+        System.out.println("[OK] UDP Verification Passed");
 
         verifyLogs(serviceId, testPayload);
 
         // 4. STOP
         resp = sendCommand("EXECUTE STOP_SERVICE|" + serviceId);
         if (!resp.contains("STOPPED")) throw new RuntimeException("Stop Failed: " + resp);
-        System.out.println("✅ Service Stopped");
+        System.out.println("[OK] Service Stopped");
     }
 
     private static String sendCommand(String text) throws IOException {
@@ -154,24 +154,24 @@ public class WorkerScriptIntegrationTest {
             for (String line : lines) {
                 if (line.contains(expectedContent)) {
                     System.out.println("\t[FILE LOG] " + line);
-                    System.out.println("✅ LOG VERIFIED: Found message after " + (i+1) + " attempt(s).");
+                    System.out.println("[OK] LOG VERIFIED: Found message after " + (i+1) + " attempt(s).");
                     return;
                 }
             }
 
             // If we are on the LAST attempt, DUMP the file to see the error
             if (i == maxRetries - 1) {
-                System.err.println("❌ LOG FAILURE DUMP START ----------------");
+                System.err.println("[FAIL] LOG FAILURE DUMP START ----------------");
                 for (String line : lines) {
                     System.err.println("\t" + line); // Print everything (including Python Errors)
                 }
-                System.err.println("❌ LOG FAILURE DUMP END ------------------");
+                System.err.println("[FAIL] LOG FAILURE DUMP END ------------------");
             }
 
             System.out.println("\t(Attempt " + (i+1) + ") Message not found yet. Retrying...");
             Thread.sleep(500);
         }
 
-        throw new RuntimeException("❌ LOG FAILED: Message '" + expectedContent + "' did not appear in logs.");
+        throw new RuntimeException("[FAIL] LOG FAILED: Message '" + expectedContent + "' did not appear in logs.");
     }
 }

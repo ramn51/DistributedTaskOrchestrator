@@ -12,7 +12,7 @@ public class ScriptExecutorHandler implements TaskHandler {
     public String execute(String payload) {
         String filename = payload;
 
-        System.out.println("⚡ [ScriptExecutor] Running: " + filename);
+        System.out.println("[INFO] [ScriptExecutor] Running: " + filename);
         File scriptFile = new File(WORKSPACE_DIR + File.separator + filename);
 
         if (!scriptFile.exists()) {

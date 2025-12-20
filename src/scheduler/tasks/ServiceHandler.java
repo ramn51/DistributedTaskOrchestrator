@@ -86,7 +86,7 @@ public class ServiceHandler implements TaskHandler {
             // 5. Clean up Map when process dies
             process.onExit().thenRun(() -> {
                 runningServices.remove(serviceId);
-                System.out.println("🛑 Service Stopped: " + serviceId);
+                System.out.println("[INFO] Service Stopped: " + serviceId);
                 parentServer.notifyMasterOfServiceStop(serviceId);
             });
 

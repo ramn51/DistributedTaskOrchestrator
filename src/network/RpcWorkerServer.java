@@ -75,9 +75,9 @@ public class RpcWorkerServer {
             TitanProtocol.send(out, requestPayload);
             String response = TitanProtocol.read(in);
             if ("REGISTERED".equals(response)) {
-                System.out.println("✅ Successfully registered with Scheduler!");
+                System.out.println("[OK] Successfully registered with Scheduler!");
             } else {
-                System.err.println("❌ Registration failed: " + response);
+                System.err.println("[FAIL] Registration failed: " + response);
             }
         }catch (IOException e){
             e.printStackTrace();
@@ -141,7 +141,7 @@ public class RpcWorkerServer {
             System.out.println("[TitanProtocol] Sent UNREGISTER_SERVICE for " + serviceId);
 
         } catch (IOException e) {
-            System.err.println("❌ Failed to notify Master: " + e.getMessage());
+            System.err.println("[FAIL] Failed to notify Master: " + e.getMessage());
         }
     }
 

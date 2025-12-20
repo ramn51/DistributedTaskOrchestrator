@@ -40,11 +40,11 @@ def titan_communicate(command):
                 bytes_recd += len(chunk)
 
             response = b"".join(chunks).decode('utf-8')
-            print(f"✅ Successfully received {len(response)} bytes.")
+            print(f"[OK] Successfully received {len(response)} bytes.")
             return response
 
     except Exception as e:
-        print(f"❌ Communication Error: {e}")
+        print(f"[FAIL] Communication Error: {e}")
         return None
 
 @app.route('/')
@@ -65,7 +65,7 @@ def index():
                 print(f"⚠️ Response contained no JSON: {raw_json}")
 
         except json.JSONDecodeError as e:
-            print(f"❌ JSON Parse Error: {e}")
+            print(f"[FAIL] JSON Parse Error: {e}")
             print(f"   Raw received: {raw_json}")
 
     if not stats:
@@ -79,7 +79,7 @@ def index():
         <div style="text-align:center; margin-bottom:30px;">
             <form action="/scale" method="post">
                 <button type="submit" style="background:#2e7d32; color:white; border:none; padding:12px 24px; border-radius:4px; cursor:pointer; font-weight:bold;">
-                    🚀 SCALE UP (+3 WORKERS)
+                    [INFO] SCALE UP (+3 WORKERS)
                 </button>
             </form>
         </div>

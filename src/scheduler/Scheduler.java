@@ -84,7 +84,7 @@ public class Scheduler {
             try {
                 schedulerServer.start();
             } catch (Exception e) {
-                System.err.println("❌ Scheduler Server crashed: " + e.getMessage());
+                System.err.println("[FAIL] Scheduler Server crashed: " + e.getMessage());
             }
         });
 
@@ -98,7 +98,7 @@ public class Scheduler {
                 runDispatchLoop();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt(); // Restore interrupt status
-                System.out.println("🛑 Dispatch Loop stopped.");
+                System.out.println("[ERROR] Dispatch Loop stopped.");
             } catch (Throwable t) {
                 // Catches RuntimeException, NoClassDefFoundError, OutOfMemoryError, etc.
                 System.err.println("CRITICAL: Dispatch Loop Died Unexpectedly!");
@@ -147,7 +147,7 @@ public class Scheduler {
             boolean matchesPort = id.contains("-" + port + "-");
 
             if (isWorker && matchesPort) {
-                System.out.println("🚀 Promoting Infrastructure: " + id + " is now a Peer Worker.");
+                System.out.println("[INFO] Promoting Infrastructure: " + id + " is now a Peer Worker.");
                 return true; // Removes it from the "under some worker" list
             }
             return false;
@@ -159,9 +159,9 @@ public class Scheduler {
     }
 
     public void submitJob(Job job){
-        System.out.println("🔗 [DAG] Job " + job.getId() + " is waiting.");
+        System.out.println("[INFO] [DAG] Job " + job.getId() + " is waiting.");
         if (!job.isReady()) {
-            System.out.println("🔗 Job " + job.getId() + " blocked by dependencies. Entering DAG Waiting Room.");
+            System.out.println("[INFO] Job " + job.getId() + " blocked by dependencies. Entering DAG Waiting Room.");
             dagWaitingRoom.put(job.getId(), job);
             return;
         }
@@ -172,7 +172,7 @@ public class Scheduler {
             System.out.println(" ** Queueing Job: " + job.getId());
             taskQueue.add(job);
         } else{
-            System.out.println("⏳ Job Delayed: " + job.getId() + " for " + delay + "ms");
+            System.out.println("[INFO] Job Delayed: " + job.getId() + " for " + delay + "ms");
             waitingRoom.add(new ScheduledJob(job));
         }
     }
@@ -240,11 +240,11 @@ public class Scheduler {
 
                 Worker selectedWorker = bestWorker;
 //                Worker selectedWorker = availableWorkers.get(ThreadLocalRandom.current().nextInt(availableWorkers.size()));
-                System.out.println("🚀 Dispatching " + job.getPayload() + " to Worker " + selectedWorker.port());
+                System.out.println("[INFO] Dispatching " + job.getPayload() + " to Worker " + selectedWorker.port());
 
                 try{
                         String response = executeJobRequest(job, selectedWorker);
-                        System.out.println("✅ Job Finished: " + response);
+                        System.out.println("[OK] Job Finished: " + response);
                         job.setStatus(Job.Status.COMPLETED);
                         history.put(job.getId(), job.getStatus());
                         unlockChildren(job.getId());
@@ -304,7 +304,7 @@ public class Scheduler {
         if (!stageResp.contains("FILE_SAVED")) {
             throw new RuntimeException("Staging failed. Expected FILE_SAVED, got: " + stageResp);
         }
-        System.out.println("✅ File Staged");
+        System.out.println("[OK] File Staged");
 
         // Step 2: Start
         String startResp = sendExecuteCommand(worker, "START_SERVICE|" + filename + "|" + job.getId()+ "|" + optionalPort);
@@ -327,7 +327,7 @@ public class Scheduler {
         if (!stageResp.contains("FILE_SAVED")) {
             throw new RuntimeException("Staging failed: " + stageResp);
         }
-        System.out.println("✅ File Staged for Run");
+        System.out.println("[OK] File Staged for Run");
 
         // STEP 2: RUN AND WAIT
         // Protocol: EXECUTE RUN_SCRIPT|filename
@@ -346,7 +346,7 @@ public class Scheduler {
         String response = schedulerClient.sendRequest(worker.host(), worker.port(), request);
 
         if (response == null || response.startsWith("ERROR") || response.startsWith("JOB_FAILED")) {
-            System.err.println("❌ Job Failed on Worker " + worker.port() + ": " + response);
+            System.err.println("[FAIL] Job Failed on Worker " + worker.port() + ": " + response);
             throw new RuntimeException("Worker Error: " + response);
         }
         return response;
@@ -376,7 +376,7 @@ public class Scheduler {
                 waitingJob.resolveDependencies(parentId);
 
                 if(waitingJob.isReady()){
-                    System.out.println("🔗 DAG: All dependencies met for " + waitingJob.getId() + ". Moving to Active Queue.");
+                    System.out.println("[INFO] DAG: All dependencies met for " + waitingJob.getId() + ". Moving to Active Queue.");
                     dagWaitingRoom.remove(waitingJob.getId());
                     submitJob(waitingJob);
                 }
@@ -387,7 +387,7 @@ public class Scheduler {
     public void cancelChildren(String failedParentId){
         for(Job job: dagWaitingRoom.values()){
             if(job.getDependenciesIds().contains(failedParentId)){
-                System.err.println("🚫 Cancelling Job " + job.getId() + " because parent " + failedParentId + " failed.");
+                System.err.println("[ERROR] Cancelling Job " + job.getId() + " because parent " + failedParentId + " failed.");
                 job.setStatus(Job.Status.DEAD);
                 history.put(job.getId(), Job.Status.DEAD);
                 dagWaitingRoom.remove(job.getId());
@@ -399,7 +399,7 @@ public class Scheduler {
 
     public String getSystemStats() {
         StringBuilder sb = new StringBuilder();
-        sb.append("\n--- 🛰️ TITAN SYSTEM MONITOR ---\n");
+        sb.append("\n--- TITAN SYSTEM MONITOR ---\n");
         sb.append(String.format("Active Workers:    %d\n", workerRegistry.getWorkers().size()));
         sb.append(String.format("Execution Queue:   %d jobs\n", taskQueue.size()));
         sb.append(String.format("Delayed (Time):    %d jobs\n", waitingRoom.size()));
@@ -430,7 +430,7 @@ public class Scheduler {
                         });
             }
         } else{
-            sb.append("⚠️ No workers currently connected.\n");
+            sb.append("[INFO] No workers currently connected.\n");
         }
         return sb.toString();
     }

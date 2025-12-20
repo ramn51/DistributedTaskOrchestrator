@@ -77,9 +77,9 @@ public class TitanDAGEndToEnd {
         }
 
         if (actual == expected) {
-            System.out.println("✅ [PASS] " + id + " is " + expected);
+            System.out.println("[OK] [PASS] " + id + " is " + expected);
         } else {
-            System.err.println("❌ [FAIL] " + id + " expected " + expected + " but was " + actual);
+            System.err.println("[FAIL] [FAIL] " + id + " expected " + expected + " but was " + actual);
         }
     }
 

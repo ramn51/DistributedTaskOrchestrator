@@ -16,7 +16,7 @@ public class TitanCLI {
 
     public void start() {
         System.out.println("==========================================");
-        System.out.println("    🚀 TITAN DISTRIBUTED ORCHESTRATOR    ");
+        System.out.println("    [INFO] TITAN DISTRIBUTED ORCHESTRATOR    ");
         System.out.println("==========================================");
         System.out.println("Connected to: " + host + ":" + port);
         System.out.println("Commands: stats, submit <skill> <data>, dag <raw_dag>, exit");
@@ -41,7 +41,7 @@ public class TitanCLI {
             // Converts 'submit TEST data' -> 'SUBMIT TEST|data|1|0'
             String[] parts = input.substring(7).split(" ", 2);
             if (parts.length < 2) {
-                System.out.println("❌ Usage: submit <skill> <data>");
+                System.out.println("[FAIL] Usage: submit <skill> <data>");
                 return;
             }
             protocolMsg = "SUBMIT " + parts[0] + "|" + parts[1] + "|1|0";
@@ -54,7 +54,7 @@ public class TitanCLI {
         }
 
         String response = sendAndReceive(protocolMsg);
-        System.out.println("📡 Server Response:\n" + response);
+        System.out.println("[INFO] Server Response:\n" + response);
     }
 
     private String sendAndReceive(String msg) {
@@ -66,7 +66,7 @@ public class TitanCLI {
             return TitanProtocol.read(in);
 
         } catch (IOException e) {
-            return "❌ Error: Could not reach Scheduler at " + host + ":" + port;
+            return "[FAIL] Error: Could not reach Scheduler at " + host + ":" + port;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

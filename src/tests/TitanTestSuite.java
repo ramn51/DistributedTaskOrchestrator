@@ -26,7 +26,7 @@ public class TitanTestSuite {
 
     public static void main(String[] args) {
         System.out.println("==========================================");
-        System.out.println("🚀 TITAN MASTER INTEGRATION SUITE");
+        System.out.println("[INFO] TITAN MASTER INTEGRATION SUITE");
         System.out.println("==========================================");
 
         int passed = 0;
@@ -41,10 +41,10 @@ public class TitanTestSuite {
             boolean success = runTestInSeparateJvm(testClass);
 
             if (success) {
-                System.out.println("✅ RESULT: PASS");
+                System.out.println("[OK] RESULT: PASS");
                 passed++;
             } else {
-                System.out.println("❌ RESULT: FAIL");
+                System.out.println("[FAIL] RESULT: FAIL");
                 failed++;
             }
 
@@ -63,10 +63,10 @@ public class TitanTestSuite {
         System.out.println("Duration:    " + (duration / 1000) + "s");
 
         if (failed > 0) {
-            System.out.println("❌ SUITE FAILED");
+            System.out.println("[FAIL] SUITE FAILED");
             System.exit(1);
         } else {
-            System.out.println("✅ SUITE PASSED");
+            System.out.println("[OK] SUITE PASSED");
             System.exit(0);
         }
     }
@@ -99,7 +99,7 @@ public class TitanTestSuite {
             return exitCode == 0;
 
         } catch (Exception e) {
-            System.err.println("❌ Error executing test process: " + e.getMessage());
+            System.err.println("[FAIL] Error executing test process: " + e.getMessage());
             e.printStackTrace();
             return false;
         }

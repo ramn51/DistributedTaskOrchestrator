@@ -45,9 +45,9 @@ public class TitanProtocol {
 
             // 4. Verify
             if (originalMessage.equals(receivedMessage)) {
-                System.out.println("✅ TEST PASSED: Protocols match!");
+                System.out.println("[OK] TEST PASSED: Protocols match!");
             } else {
-                System.out.println("❌ TEST FAILED: Messages differ.");
+                System.out.println("[FAIL] TEST FAILED: Messages differ.");
             }
 
         } catch (Exception e) {

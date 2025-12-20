@@ -7,7 +7,7 @@ def titan_read(sock):
         # Java's writeInt sends 4 bytes
         raw_len = sock.recv(4)
         if not raw_len:
-            print("❌ Error: No length prefix received.")
+            print("[FAIL] Error: No length prefix received.")
             return None
 
         # '>I' means Big-Endian Unsigned Integer (Standard for Java)
@@ -23,7 +23,7 @@ def titan_read(sock):
 
         return b"".join(chunks).decode('utf-8')
     except Exception as e:
-        print(f"❌ Read Error: {e}")
+        print(f"[FAIL] Read Error: {e}")
         return None
 
 def verify_titan():
@@ -45,13 +45,13 @@ def verify_titan():
             # 2. Read Response
             result = titan_read(s)
             if result:
-                print("✅ DATA RECEIVED:")
+                print("[OK] DATA RECEIVED:")
                 print(result)
             else:
                 print("⚠️ Received empty string from Scheduler.")
 
     except Exception as e:
-        print(f"❌ CONNECTION FAILED: {e}")
+        print(f"[FAIL] CONNECTION FAILED: {e}")
 
     print("--- DIAGNOSTIC COMPLETE ---")
 

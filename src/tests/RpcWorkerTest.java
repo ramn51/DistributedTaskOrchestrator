@@ -36,18 +36,18 @@ public class RpcWorkerTest {
         String response1 = rpcClient.sendRequest("localhost", TEST_PORT, "PING");
 
         if ("PONG".equals(response1)) {
-            System.out.println("✅ PING Test PASSED. Response: " + response1);
+            System.out.println("[OK] PING Test PASSED. Response: " + response1);
         } else {
-            System.err.println("❌ PING Test FAILED. Response: " + response1);
+            System.err.println("[FAIL] PING Test FAILED. Response: " + response1);
         }
 
         System.out.println("[TEST] Sending EXECUTE...");
         String response2 = rpcClient.sendRequest("localhost", TEST_PORT, "EXECUTE Job_123");
 
         if ("EXECUTED".equals(response2)) {
-            System.out.println("✅ EXECUTE Test PASSED. Response: " + response2);
+            System.out.println("[OK] EXECUTE Test PASSED. Response: " + response2);
         } else {
-            System.err.println("❌ EXECUTE Test FAILED. Response: " + response2);
+            System.err.println("[FAIL] EXECUTE Test FAILED. Response: " + response2);
         }
 
         // --- STEP 5: Cleanup ---

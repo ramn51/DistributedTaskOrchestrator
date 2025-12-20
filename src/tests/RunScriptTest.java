@@ -58,7 +58,7 @@ public class RunScriptTest {
             throw new RuntimeException("Test Failed: Scheduler rejected job");
         }
 
-        System.out.println("✅ Job Submitted successfully.");
+        System.out.println("[OK] Job Submitted successfully.");
         System.out.println("👀 Watch the Console logs above for 'RESULT: COMPLETED|0|Result: 5050'");
 
         // Keep alive to allow job to finish executing

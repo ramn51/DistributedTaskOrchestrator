@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit;
 public class WorkerLoadTest {
 
     public static void main(String[] args) throws Exception {
-        System.out.println("=== 🚀 STARTING LOAD TEST ===");
+        System.out.println("=== [INFO] STARTING LOAD TEST ===");
 
         // 1. Start Scheduler
         Scheduler scheduler = new Scheduler(9090);
@@ -56,9 +56,9 @@ public class WorkerLoadTest {
         System.out.println("📊 Registry Count: " + registeredCount + " / " + WORKER_COUNT);
 
         if (registeredCount == WORKER_COUNT) {
-            System.out.println("✅ LOAD TEST PASSED: All workers registered concurrently.");
+            System.out.println("[OK] LOAD TEST PASSED: All workers registered concurrently.");
         } else {
-            System.err.println("❌ LOAD TEST FAILED: Missing workers!");
+            System.err.println("[FAIL] LOAD TEST FAILED: Missing workers!");
         }
 
         // 5. Cleanup

@@ -16,7 +16,7 @@ public class Main {
             switch (mode) {
                 case "SCHEDULER":
                     int schedPort = (args.length > 1) ? Integer.parseInt(args[1]) : 9090;
-                    System.out.println("🚀 Starting Titan Scheduler on port " + schedPort);
+                    System.out.println("[INFO] Starting Titan Scheduler on port " + schedPort);
                     Scheduler scheduler = new Scheduler(schedPort);
                     scheduler.start();
                     break;
@@ -28,7 +28,7 @@ public class Main {
                     int sPort = (args.length > 3) ? Integer.parseInt(args[3]) : 9090;
                     String cap = (args.length > 4) ? args[4] : "GENERAL";
 
-                    System.out.println("👷 Starting Titan Worker on port " + myPort);
+                    System.out.println("[INFO] Starting Titan Worker on port " + myPort);
                     RpcWorkerServer worker = new RpcWorkerServer(myPort, sHost, sPort, cap);
                     worker.start();
                     break;
@@ -39,7 +39,7 @@ public class Main {
                     break;
             }
         } catch (Exception e) {
-            System.err.println("❌ Critical failure during startup:");
+            System.err.println("[FAIL] Critical failure during startup:");
             e.printStackTrace();
         }
     }
