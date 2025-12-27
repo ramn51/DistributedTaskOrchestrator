@@ -22,7 +22,8 @@ public class RpcClient {
     public String sendRequest(String host, int port, byte opCode, String payload){
         try(Socket socket = new Socket(host, port)){
             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-            socket.setSoTimeout(10000); // If i dont get response within 3 seconds I timeout (detecting failed jobs)
+            int timeout = 30000;
+            socket.setSoTimeout(timeout); // If i dont get response within 30 seconds I timeout (detecting failed jobs)
             TitanProtocol.send(out, opCode, payload);
 
             DataInputStream in = new DataInputStream(socket.getInputStream());

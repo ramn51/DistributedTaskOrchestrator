@@ -110,11 +110,14 @@ public class RpcWorkerServer {
                         TitanProtocol.send(out, TitanProtocol.OP_ACK, stats);
 
                     } else if (packet.opCode == TitanProtocol.OP_STAGE) {
-                        handleExecution(out, packet.payload, "STAGE_FILE");
+                        // handleExecution(out, packet.payload, "STAGE_FILE");
+                        handleSyncExecution(out, packet.payload, "STAGE_FILE");
                     } else if (packet.opCode == TitanProtocol.OP_START_SERVICE) {
-                        handleExecution(out, packet.payload, "START_SERVICE");
+//                        handleExecution(out, packet.payload, "START_SERVICE");
+                        handleSyncExecution(out, packet.payload, "START_SERVICE");
                     } else if (packet.opCode == TitanProtocol.OP_STOP) {
-                        handleExecution(out, packet.payload, "STOP_SERVICE");
+//                        handleExecution(out, packet.payload, "STOP_SERVICE");
+                        handleSyncExecution(out, packet.payload, "STOP_SERVICE");
                     } else if (packet.opCode == TitanProtocol.OP_RUN) {
                         if (packet.payload.startsWith("SHUTDOWN_WORKER")) {
                             System.out.println("Worker received kill signal. Shutting down...");
@@ -124,7 +127,8 @@ public class RpcWorkerServer {
                             System.exit(0);
                         }
 
-                        handleExecution(out, packet.payload, "RUN_SCRIPT");
+//                        handleExecution(out, packet.payload, "RUN_SCRIPT");
+                        handleAsyncExecution(out, packet.payload);
                     }
                 } catch (EOFException e) {
                     System.out.println("Scheduler disconnected.");
@@ -210,8 +214,10 @@ public class RpcWorkerServer {
             if(parts.length < 2)
                 return "INVALID_JOB_FORMAT";
 
-            String taskType = parts[0]; // Ex: "START_SERVICE" or "PDF_CONVERT"
-            String taskData = parts[1]; // Ex: "file.jar|jobId|8085"
+            // Ex: "START_SERVICE" or "PDF_CONVERT"
+            String taskType = parts[0];
+            // Ex: "file.jar|jobId|8085"
+            String taskData = parts[1];
 
             if (payload.contains("SLEEP")) {
                 try { Thread.sleep(5000); } catch (Exception e) {}
@@ -235,6 +241,75 @@ public class RpcWorkerServer {
             } else{
                 return "ERROR: Task doesnt exist so I dont know how to do " + taskType;
             }
+    }
+
+    private void handleAsyncExecution(DataOutputStream out, String payload){
+        if(activeJobs.get() >= MAX_THREADS){
+            try{
+                TitanProtocol.send(out, TitanProtocol.OP_ERROR, "ERROR_WORKER_SATURATED");
+            } catch (IOException e){
+                e.printStackTrace();
+            }
+            return;
+        }
+
+        activeJobs.incrementAndGet();
+        workerPool.submit(() ->{
+            // Parse Job ID for Callback
+            // Payload Format expected: "JOB-123|calc.py" (Standard) or "calc.py" (Legacy/Direct)
+            String[] parts = payload.split("\\|", 2);
+            String jobId = (parts.length > 1) ? parts[0] : "UNKNOWN";
+            String taskData = (parts.length > 1) ? parts[1] : payload;
+            // This for Test jobs
+            if(parts[0].equals("TEST")) { jobId = "TEST-JOB"; taskData = parts[1]; }
+            try {
+                System.out.println("[ASYNC] Starting job "+ jobId + ": " + taskData);
+                TaskHandler handler = taskHanlderMap.get("RUN_SCRIPT");
+                String result = handler.execute(taskData);
+
+                System.out.println("[ASYNC] Finished "+ jobId);
+                sendCallback(jobId, "COMPLETED", result);
+            } catch(Exception e){
+                System.err.println("[ASYNC] Failed " + jobId + ": " + e.getMessage());
+                sendCallback(jobId, "FAILED", e.getMessage());
+            } finally {
+                activeJobs.decrementAndGet();
+            }
+        });
+        try {
+            TitanProtocol.send(out, TitanProtocol.OP_ACK, "JOB_ACCEPTED");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    private void sendCallback(String jobId, String status, String result) {
+        if(jobId.equals("UNKNOWN") || jobId.equals("TEST-JOB")) return;
+
+        try (Socket socket = new Socket(schedulerHost, schedulerPort);
+             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+             DataInputStream in = new DataInputStream(socket.getInputStream())) {
+
+            String msg = jobId + "|" + status + "|" + result;
+            TitanProtocol.send(out, TitanProtocol.OP_JOB_COMPLETE, msg);
+            TitanProtocol.read(in);
+
+        } catch (Exception e) {
+            System.err.println("[FAIL] Callback failed: " + e.getMessage());
+        }
+    }
+
+    private void handleSyncExecution(DataOutputStream out, String payload, String forceTaskType){
+        try{
+            String response = processCommandExplicit(forceTaskType, payload);
+            byte status = response.startsWith("ERROR") || response.contains("FAILED")
+                    ? TitanProtocol.OP_ERROR
+                    : TitanProtocol.OP_ACK;
+            TitanProtocol.send(out, status, response);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public void stop(){

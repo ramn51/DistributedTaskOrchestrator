@@ -4,14 +4,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-//public record Worker(String host, int port, long lastSeen, List<String> capabilities){
-//    public Worker{
-//        if(capabilities == null){
-//            capabilities = Collections.emptyList();
-//        }
-//    }
-//}
-
 public class Worker {
     private final String host;
     private final int port;
@@ -21,6 +13,7 @@ public class Worker {
     private long lastSeen;
     private int currentLoad;
     private int maxCap;
+    public String currentJobId = null;
 
     public Worker(String host, int port, List<String> capabilities) {
         this.host = host;
@@ -41,6 +34,16 @@ public class Worker {
 
     public int getCurrentLoad() {
         return currentLoad;
+    }
+
+    synchronized public void incrementCurrentLoad(){
+        this.currentLoad++;
+    }
+
+    synchronized public void decrementCurrentLoad(){
+        if(this.currentLoad > 0){
+            this.currentLoad--;
+        }
     }
 
     public boolean isSaturated(){

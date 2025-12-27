@@ -14,7 +14,6 @@ SCHEDULER_PORT = 9090
 CURRENT_VERSION = 1
 OP_STATS_JSON = 0x09
 
-# Add this helper at the top
 def recv_all(sock, n):
     data = b''
     while len(data) < n:
@@ -23,43 +22,49 @@ def recv_all(sock, n):
         data += packet
     return data
 
-def titan_communicate(op_code, payload_str=""):
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(5)
-        s.connect((SCHEDULER_HOST, SCHEDULER_PORT))
+def titan_communicate(op_code, payload_str="", retries=5): # Increased to 5
+    attempt = 0
+    while attempt < retries:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(3) # Increased timeout slightly
+            s.connect((SCHEDULER_HOST, SCHEDULER_PORT))
 
-        # --- SEND ---
-        body_bytes = payload_str.encode('utf-8')
-        length = len(body_bytes)
-        header = struct.pack('>BBBBI', CURRENT_VERSION, op_code, 0, 0, length)
-        s.sendall(header + body_bytes)
+            body_bytes = payload_str.encode('utf-8')
+            length = len(body_bytes)
+            header = struct.pack('>BBBBI', CURRENT_VERSION, op_code, 0, 0, length)
+            s.sendall(header + body_bytes)
 
-        # --- READ HEADER (FIXED) ---
-        raw_header = recv_all(s, 8)
-        if not raw_header:
+            raw_header = recv_all(s, 8)
+            if not raw_header:
+                s.close()
+                return None
+
+            ver, resp_op, flags, spare, resp_len = struct.unpack('>BBBBI', raw_header)
+            response_payload = ""
+            if resp_len > 0:
+                raw_body = recv_all(s, resp_len)
+                if raw_body:
+                    response_payload = raw_body.decode('utf-8')
+
             s.close()
+            return response_payload
+
+        except (ConnectionRefusedError, ConnectionResetError, socket.timeout):
+            # WinError 10061 (Refused) or 10054 (Reset)
+            # The server is busy. Wait longer this time.
+            attempt += 1
+            print(f"[WARN] Connection retry {attempt}/{retries}...")
+            time.sleep(0.5) # Wait 500ms before retrying
+
+        except Exception as e:
+            print(f"[FAIL] Communication Error: {e}")
             return None
 
-        ver, resp_op, flags, spare, resp_len = struct.unpack('>BBBBI', raw_header)
-
-        # --- READ BODY (FIXED) ---
-        response_payload = ""
-        if resp_len > 0:
-            raw_body = recv_all(s, resp_len)
-            if raw_body:
-                response_payload = raw_body.decode('utf-8')
-
-        s.close()
-        return response_payload
-
-    except Exception as e:
-        print(f"[FAIL] Communication Error: {e}")
-        return None
+    return None
 
 @app.route('/')
 def index():
-    # Fetch Data from Scheduler
     raw_json = titan_communicate(OP_STATS_JSON, "")
     stats = None
 
@@ -71,28 +76,51 @@ def index():
         except json.JSONDecodeError:
             pass
 
-    # Default Data if Offline
     if not stats:
         stats = {"active_workers": 0, "queue_size": 0, "workers": []}
-        status_color = "#f44336" # Red
+        status_color = "#f44336"
         status_text = "OFFLINE"
     else:
-        status_color = "#00e676" # Green
+        status_color = "#00e676"
         status_text = "ONLINE"
 
-    # HTML TEMPLATE
     return render_template_string("""
     <!DOCTYPE html>
     <html>
     <head>
         <title>Titan Dashboard</title>
-        <meta http-equiv="refresh" content="2"> <style>
+        <meta http-equiv="refresh" content="1">
+        <style>
             body { background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; padding: 20px; }
             .header { text-align: center; margin-bottom: 30px; }
             .status-dot { height: 12px; width: 12px; background-color: {{ status_color }}; border-radius: 50%; display: inline-block; }
-            .card { background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 20px; width: 300px; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
+
+            .card { background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 20px; width: 320px; box-shadow: 0 4px 6px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
             .grid { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
-            .service-tag { background: #263238; padding: 5px 8px; margin-top: 5px; border-radius: 4px; border-left: 3px solid #0288d1; font-family: monospace; }
+
+            .section-title { font-size: 0.75em; text-transform: uppercase; letter-spacing: 1px; color: #757575; margin-top: 15px; margin-bottom: 5px; border-bottom: 1px solid #333; padding-bottom: 2px;}
+            .service-tag { background: #263238; padding: 5px 8px; margin-top: 5px; border-radius: 4px; border-left: 3px solid #0288d1; font-family: monospace; font-size: 0.9em; }
+
+            .hist-list { list-style: none; padding: 0; margin: 0; }
+            .hist-item { display: flex; justify-content: space-between; align-items: center; font-size: 0.85em; padding: 6px 0; border-bottom: 1px solid #2c2c2c; }
+            .hist-item:last-child { border-bottom: none; }
+
+            .hist-id { color: #90caf9; font-family: monospace; }
+            .hist-meta { text-align: right; }
+            .hist-time { display: block; font-size: 0.8em; color: #757575; }
+
+            .status-badge { font-weight: bold; font-size: 0.85em; padding: 2px 6px; border-radius: 4px; }
+            .st-COMPLETED { color: #00e676; background: rgba(0, 230, 118, 0.1); }
+            .st-FAILED { color: #ff5252; background: rgba(255, 82, 82, 0.1); }
+            .st-RUNNING { color: #ffb74d; background: rgba(255, 183, 77, 0.1); }
+            .st-DEAD { color: #9e9e9e; background: rgba(158, 158, 158, 0.1); border: 1px solid #555; }
+
+            /* Pulsing Yellow Animation */
+            @keyframes pulse-yellow {
+                0% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 183, 77, 0.7); }
+                70% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(255, 183, 77, 0); }
+                100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 183, 77, 0); }
+            }
         </style>
     </head>
     <body>
@@ -108,18 +136,51 @@ def index():
         <div class="grid">
             {% for w in stats.workers %}
             <div class="card" style="border-top: 4px solid #4CAF50;">
+
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <h3 style="margin:0;">Node :{{ w.port }}</h3>
                     <span style="background:#004d40; color:#00e676; padding:2px 8px; border-radius:4px; font-size:0.8em;">Load: {{ w.load }}</span>
                 </div>
-                <hr style="border:0; border-top:1px solid #333; margin:15px 0;">
-                <div style="font-size:0.9em; color:#bbb;">
+
+                <div class="section-title">Current Status</div>
+                {% if w.active_job %}
+                    <div style="background: #2e2010; border: 1px solid #f57c00; padding: 12px; border-radius: 6px; display: flex; align-items: center; gap: 12px; margin-top: 5px;">
+                        <div style="width: 12px; height: 12px; background: #ffb74d; border-radius: 50%; animation: pulse-yellow 1.5s infinite;"></div>
+                        <div style="flex-grow: 1;">
+                            <div style="font-size: 0.7em; color: #ffcc80; letter-spacing: 0.5px; font-weight: bold;">EXECUTING NOW</div>
+                            <div style="font-family: monospace; font-size: 1.1em; color: #fff;">{{ w.active_job }}</div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div style="background: #1b2e23; border: 1px solid #2e7d32; padding: 8px; border-radius: 6px; color: #81c784; font-size: 0.85em; text-align: center; margin-top: 5px;">
+                        ● Worker Idle
+                    </div>
+                {% endif %}
+
+                <div class="section-title">Running Services</div>
+                <div>
                     {% for svc in w.services %}
                         <div class="service-tag">{{ svc }}</div>
                     {% else %}
-                        <div style="color:#666; font-style:italic;">• Idle</div>
+                        <div style="color:#555; font-style:italic; font-size:0.9em; padding: 5px 0;">• No active services</div>
                     {% endfor %}
                 </div>
+
+                <div class="section-title">Recent Activity</div>
+                <ul class="hist-list">
+                    {% for job in w.history %}
+                        <li class="hist-item">
+                            <span class="hist-id">{{ job.id }}</span>
+                            <div class="hist-meta">
+                                <span class="status-badge st-{{ job.status }}">{{ job.status }}</span>
+                                <span class="hist-time">{{ job.time }}</span>
+                            </div>
+                        </li>
+                    {% else %}
+                        <li style="color:#555; font-style:italic; font-size:0.9em; padding: 5px 0;">• No history yet</li>
+                    {% endfor %}
+                </ul>
+
             </div>
             {% endfor %}
         </div>

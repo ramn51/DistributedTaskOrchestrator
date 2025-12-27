@@ -34,7 +34,7 @@ def submit_job(job_id, script_content):
 
         # Format matches your handleDeploy logic:
         # DEPLOY_PAYLOAD|filename|base64data|port(optional/0)
-        payload = f"DEPLOY_PAYLOAD|calc.py|{encoded_script}|0"
+        payload = f"RUN_PAYLOAD|calc.py|{encoded_script}|0"
         payload_bytes = payload.encode('utf-8')
 
         # Header: Ver(1) | Op(3) | Flags(0) | Spare(0) | Length

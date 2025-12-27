@@ -15,7 +15,14 @@ Titan provides a streamlined environment for diverse workloads:
 
 *Built as a systems engineering initiative, Titan explores the "hard parts" of distributed computing—custom RPC protocols, consensus, and state management—implemented from scratch in Java with **zero external dependencies**.*
 
-## [INFO] Key Features
+## 🖥️ Dashboard
+<p align="center">
+  <img src="screenshots/UI_Screenshot.png" alt="Main Dashboard View" width="45%" style="margin-right: 10px;"/>
+</p>
+
+*Visualizes real-time node health, execution history, and allows direct log streaming from workers.*
+
+## Key Features
 
 - **Dual-Layer Orchestration**:
     - **Workload Layer**: Manages complex job dependencies, retries, and scheduling priorities.
@@ -27,7 +34,10 @@ Titan provides a streamlined environment for diverse workloads:
     -  **Binaries**: JAR/Binary propagation (Bytecode distribution).
     -  **Ops Tasks**: Email alerts, PDF conversions, DB cleanup signals.
 - **Custom TCP Protocol**: Implements a custom wire protocol (`TITAN_PROTOCOL`) using fixed-header framing (Version + OpCode + Length). Designed to handle TCP fragmentation and avoid the overhead of text-based protocols like JSON.
-- **Real-time Dashboard**: A lightweight Flask (Python) UI to visualize node health, active job queues, and real-time logs..
+- **Real-time Dashboard**: A lightweight Flask (Python) UI to visualize node health, active job queues, and real-time logs.
+- **Optimistic Scheduling & Fail-Fast**: The scheduler utilizes "Optimistic Accounting" to pre-reserve execution slots, preventing race conditions during burst submissions. It detects infrastructure conflicts (e.g., blocked ports) instantly, rejecting bad deployments without wasting retry cycles.
+- **Task Affinity**: Implements "Parent-Child Affinity," where sub-tasks spawned by a worker are preferentially scheduled on the same node (or a specific target) to minimize network latency and leverage local caching. Mainly useful for ML and other workloads that need specific environment and dependent tasks.
+
 
 ## 🛠️ Architecture
 
@@ -37,6 +47,7 @@ The system follows a **Leader-Follower** topology with a decoupled control plane
     - Role: The "Brain" of the cluster.
     - Responsibilities:
         - Parses Job DAGs and builds execution trees.
+        - Enforces Task Affinity to keep related workloads together.
         - Manages the JobQueue and WaitingRoom (for tasks pending dependencies).
         - Assigns tasks using a Least-Connections load-balancing algorithm.
         - Maintains cluster state consistency via WAL.

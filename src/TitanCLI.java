@@ -79,14 +79,13 @@ public class TitanCLI {
             try {
                 // Syntax: shutdown 8086
                 String[] parts = input.split(" ");
-                int targetPort = Integer.parseInt(parts[1]);
+                String targetPort = parts[1]; // Keep as string for payload
+                System.out.println("Requesting Sscheduler to shutdown node " + targetPort + "...");
+                opCode = TitanProtocol.OP_KILL_WORKER;
+                payload = targetPort;
 
-                System.out.println("Attempting to shutdown worker on port " + targetPort + "...");
-                sendShutdownCommand("localhost", targetPort);
-                return;
-
-            } catch (NumberFormatException e) {
-                System.err.println("Invalid port number.");
+            } catch (Exception e) {
+                System.err.println("Usage: shutdown <port>");
                 return;
             }
         }

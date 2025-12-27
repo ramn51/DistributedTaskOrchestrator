@@ -6,18 +6,13 @@ import network.SchedulerServer;
 import network.TitanProtocol;
 
 import java.io.IOException;
+import java.net.Socket;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.*;
 import java.util.concurrent.DelayQueue;
-
-class ServiceInfo {
-    Worker hostWorker;
-    long startTime;
-    String status; // "STARTING", "RUNNING", "FAILED"
-}
 
 public class Scheduler {
     private final WorkerRegistry workerRegistry;
@@ -35,9 +30,15 @@ public class Scheduler {
     private int port;
 
     // This is purely for validation purpose
-    private final Map<String, Job.Status> history = new ConcurrentHashMap<>();
+    private final Map<String, TaskExecution> executionHistory = new ConcurrentHashMap<>();
     private final Map<String, Worker> liveServiceMap = new ConcurrentHashMap<>();
 
+    // For history maintenance of (tasks all types).
+    private final Map<String, Integer> workerCompletionStats = new ConcurrentHashMap<>();
+    private final Map<String, java.util.Deque<Job>> workerRecentHistory = new ConcurrentHashMap<>();
+
+    // Map to hold Active Job Objects for Async Retries
+    private final Map<String, Job> runningJobs = new ConcurrentHashMap<>();
     private final Map<String, Job> dagWaitingRoom;
 
     public Scheduler(int port){
@@ -197,26 +198,58 @@ public class Scheduler {
 
     public void submitJob(String jobPayload) {
         System.out.println("** Scheduler received job: " + jobPayload);
-        String[] parts = jobPayload.split("\\|");
-        String data = parts.length > 1 ? parts[0] + "|" + parts[1] : jobPayload;
-        int priority = parts.length > 2 ? Integer.parseInt(parts[2]) : 1;
-        long delay = parts.length > 3 ? Long.parseLong(parts[3]) : 0;
 
-        submitJob(new Job(data, priority, delay));
+        if (jobPayload.startsWith("DEPLOY_PAYLOAD") || jobPayload.startsWith("RUN_PAYLOAD")) {
+            String temp = jobPayload.trim();
+            long delay = 0;
+            int priority = 1;
+            //  Trying to extract DELAY from the end
+            int lastPipe = temp.lastIndexOf('|');
+            if (lastPipe != -1) {
+                String suffix = temp.substring(lastPipe + 1);
+                try {
+                    // If the last part is a number, it's the DELAY, on success we strip it off.
+                    delay = Long.parseLong(suffix);
+                    temp = temp.substring(0, lastPipe);
+                } catch (NumberFormatException e) {
+                    // if its not a number Then it's part of the Base64 or filename.
+                    // Delay remains 0. No stripping further.
+                }
+            }
+
+            // Try to extract PRIORITY from the new end ---
+            lastPipe = temp.lastIndexOf('|');
+            if (lastPipe != -1) {
+                String suffix = temp.substring(lastPipe + 1);
+                try {
+                    // If the new last part is a number, it's the PRIORITY and then on success we strip it off
+                    priority = Integer.parseInt(suffix);
+                    temp = temp.substring(0, lastPipe);
+                } catch (NumberFormatException e) {
+                    // Priority remains 1. No stripping further if its not a number
+                }
+            }
+            // Submit the task 'temp' now contains just the raw payload (HEADER|FILE|BASE64)
+            submitJob(new Job(temp, priority, delay));
+
+        } else {
+
+            String[] parts = jobPayload.split("\\|");
+            String data = parts.length > 1 ? parts[0] + "|" + parts[1] : jobPayload;
+            int priority = parts.length > 2 ? Integer.parseInt(parts[2]) : 1;
+            long delay = parts.length > 3 ? Long.parseLong(parts[3]) : 0;
+
+            submitJob(new Job(data, priority, delay));
+        }
     }
 
     private void runDispatchLoop() throws InterruptedException {
         System.out.println("Running Dispatch Loop");
         while (isRunning) {
-
-//                if(taskQueue.isEmpty()){
-//                    Thread.sleep(1000);
-//                    continue;
-//                }
                 Job job = taskQueue.take();
                 System.out.println("DEBUG: Processing Job ID: " + job.getId());
                 job.setStatus(Job.Status.RUNNING);
-                history.put(job.getId(), job.getStatus());
+//                history.put(job.getId(), job.getStatus());
                 System.out.println(" Job Processing: " + job);
 
                 String[] parts = job.getPayload().split("\\|", 2);
@@ -240,51 +273,98 @@ public class Scheduler {
                     continue;
                 }
 
-                // Get the least loaded worker
-                Worker bestWorker = null;
-                int minLoad = Integer.MAX_VALUE;
-                for(Worker worker: availableWorkers){
-                    if(worker.isSaturated())
-                        continue;
+                Worker selectedWorker = selectBestWorker(job, availableWorkers);
 
-                    if(worker.getCurrentLoad() < minLoad){
-                        minLoad = worker.getCurrentLoad();
-                        bestWorker = worker;
-                    }
-                }
-
-                if(bestWorker == null){
-                    System.out.println("All workers SATURATED. Re-queueing job.");
+                if (selectedWorker == null) {
+                    System.out.println("All workers SATURATED or unavailable. Re-queueing job.");
                     job.setStatus(Job.Status.PENDING);
-                    taskQueue.add(job);
-                    history.put(job.getId(), job.getStatus());
+                    taskQueue.put(job); // Use put for blocking
                     Thread.sleep(1000);
                     continue;
                 }
+                selectedWorker.incrementCurrentLoad();
+                TaskExecution record = new TaskExecution(job.getId(), selectedWorker);
+                executionHistory.put(job.getId(), record);
+                runningJobs.put(job.getId(), job);
 
-                Worker selectedWorker = bestWorker;
 //                Worker selectedWorker = availableWorkers.get(ThreadLocalRandom.current().nextInt(availableWorkers.size()));
-                System.out.println("[INFO] Dispatching " + job.getPayload() + " to Worker " + selectedWorker.port());
-
+                System.out.println("[INFO] Dispatching " + job.getId() + " to Worker " + selectedWorker.port());
                 try{
                         String response = executeJobRequest(job, selectedWorker);
                         System.out.println("[OK] Job Finished: " + response);
-                        job.setStatus(Job.Status.COMPLETED);
-                        history.put(job.getId(), job.getStatus());
-                        unlockChildren(job.getId());
+
+                        if("JOB_ACCEPTED".equals(response)){
+                            System.out.println("[ASYNC] Job " + job.getId() + " accepted by worker. Waiting for callback.");
+                        }else {
+                            System.out.println("[SYNC] Task finished immediately: " + response);
+                            completeJob(job, response, record);
+
+                            // NOTE: For Sync jobs (Deploy), we complete and decrement immediately here
+                            // because they don't trigger the handleJobCallback.
+                            selectedWorker.decrementCurrentLoad();
+                        }
+
+
+//                        job.setStatus(Job.Status.COMPLETED);
+////                        history.put(job.getId(), job.getStatus());
+//                        record.complete(response);
+//
+//                        String wKey = String.valueOf(selectedWorker.port());
+//                        workerCompletionStats.merge(wKey, 1, Integer::sum);
+//                        workerRecentHistory.computeIfAbsent(wKey, k -> new java.util.concurrent.ConcurrentLinkedDeque<>()).add(job);
+//                        // per history tracking of the jobs. Keeping it to 10 for now.
+//                        if (workerRecentHistory.get(wKey).size() > 10) {
+//                            workerRecentHistory.get(wKey).removeFirst();
+//                        }
+//
+//                        // Tells the child tasks to use the same worker as the parent used.
+//                        propagateAffinity(job.getId(), wKey);
+//                        unlockChildren(job.getId());
 
                 } catch (Exception e){
-                    handleJobFailure(job);
+                    System.err.println("[FAIL] Job " + job.getId() + " Error: " + e.getMessage());
+                    record.fail(e.getMessage());
+
+                    runningJobs.remove(job.getId());
+
+                    if (selectedWorker != null) {
+                        selectedWorker.currentJobId = null;
+                        selectedWorker.decrementCurrentLoad();
+                        String wKey = String.valueOf(selectedWorker.port());
+                        workerRecentHistory.computeIfAbsent(wKey, k -> new java.util.concurrent.ConcurrentLinkedDeque<>()).add(job);
+                        // Keep list size in check
+                        if (workerRecentHistory.get(wKey).size() > 10) {
+                            workerRecentHistory.get(wKey).removeFirst();
+                        }
+                    }
+
+                    if (e.getMessage().contains("SATURATED")) {
+                        System.out.println("[WARN] Worker " + selectedWorker.port() + " is Saturated (Optimistic check failed). Penalizing.");
+                        selectedWorker.setCurrentLoad(99);
+                    }
+
+
+                    // We fail the job here and not give it retry if its a deployment issue
+                    if (e.getMessage().contains("ALREADY in use") || e.getMessage().contains("Deployment Rejected")) {
+                        System.err.println("[FAIL-FAST] Non-recoverable error. Cancelling retries.");
+                        job.setStatus(Job.Status.FAILED);
+                        // We do NOT call handleJobFailure(job) here, so it won't retry/become DEAD.
+                    } else{
+                        handleJobFailure(job);
 //                    history.put(job.getId(), job.getStatus());
+                    }
                 }
             }
         }
 
     private void handleJobFailure(Job job) {
+        TaskExecution record = executionHistory.get(job.getId());
         job.incrementRetry();
         if(job.getRetryCount() > 3) {
             job.setStatus(Job.Status.DEAD);
-            history.put(job.getId(), Job.Status.DEAD);
+
+            if (record != null) record.status = Job.Status.DEAD;
+//            history.put(job.getId(), Job.Status.DEAD);
             System.err.println("Job Moved to DLQ (Max Retries): " + job);
             this.deadLetterQueue.offer(job);
             cancelChildren(job.getId());
@@ -293,28 +373,157 @@ public class Scheduler {
             job.setStatus(Job.Status.FAILED);
             System.err.println("Job Failed. Retrying... (" + job.getRetryCount() + "/3)");
             job.setStatus(Job.Status.PENDING);
-            history.put(job.getId(), Job.Status.PENDING);
+            // We leave the record as FAILED for now so history shows it failed
+            //history.put(job.getId(), Job.Status.PENDING);
             taskQueue.offer(job);
         }
     }
 
+    public void handleJobCallback(String payload){
+        // Payload: "JOB-123|COMPLETED|Result: 5050"
+        String[] parts = payload.split("\\|", 3);
+        if (parts.length < 2) return;
+
+        String jobId = parts[0];
+        String statusStr = parts[1];
+        String result = (parts.length > 2) ? parts[2] : "";
+
+        TaskExecution record = executionHistory.get(jobId);
+        Job job = runningJobs.remove(jobId);
+
+        if(record != null){
+            // Clear "Active Job" flag on Worker (Stop Pulse (for dash))
+            if (record.assignedWorker != null) {
+                record.assignedWorker.currentJobId = null;
+            }
+
+            if(statusStr.equals("COMPLETED")){
+//                if(record.assignedWorker != null){
+                    System.out.println("[ASYNC] Callback: Job " + jobId + " Finished.");
+                    completeJob(job, result, record);
+
+                    if (record.assignedWorker != null) {
+                        record.assignedWorker.decrementCurrentLoad();
+                    }
+//                    if(job != null) job.setStatus(Job.Status.COMPLETED);
+//                }
+            } else {
+                System.err.println("[ASYNC] [FAILED] Callback: Job " + jobId + " Failed.");
+                record.fail(result);
+
+                if (job != null) {
+                    handleJobFailure(job);
+                } else {
+                    System.err.println("CRITICAL: Job object lost for " + jobId + ", cannot retry.");
+                }
+            }
+        } else {
+            System.err.println("[WARN] Received callback for unknown Job ID: " + jobId);
+        }
+
+
+    }
+
+    private void completeJob(Job job, String result, TaskExecution record){
+        record.complete(result);
+
+        if (job != null) job.setStatus(Job.Status.COMPLETED);
+
+        if (record.assignedWorker != null) {
+            String wKey = String.valueOf(record.assignedWorker.port());
+            workerCompletionStats.merge(wKey, 1, Integer::sum);
+
+            if (job != null) {
+                workerRecentHistory.computeIfAbsent(wKey, k -> new java.util.concurrent.ConcurrentLinkedDeque<>()).add(job);
+                if (workerRecentHistory.get(wKey).size() > 10) {
+                    workerRecentHistory.get(wKey).removeFirst();
+                }
+            }
+
+            propagateAffinity(job.getId(), wKey);
+        }
+        unlockChildren(job.getId());
+    }
+
+    private Worker selectBestWorker(Job job, List<Worker> availableWorkers){
+        if(job.getPreferredWorkerId() != null){
+            for(Worker w: availableWorkers){
+                if(String.valueOf(w.port()).equals(job.getPreferredWorkerId()) && !w.isSaturated()){
+                    System.out.println("[AFFINITY] Sticky Scheduling: Routing Job " + job.getId() + " to Worker " + w.port());
+                    return w;
+                }
+            }
+        }
+
+        // Get the least loaded worker
+        Worker bestWorker = null;
+        int minLoad = Integer.MAX_VALUE;
+        for(Worker worker: availableWorkers){
+            if(worker.isSaturated())
+                continue;
+
+            if(worker.getCurrentLoad() < minLoad){
+                minLoad = worker.getCurrentLoad();
+                bestWorker = worker;
+            }
+        }
+
+        return bestWorker;
+    }
+
+    private void propagateAffinity(String parentId, String workerPortId) {
+        boolean workerAlive = workerRegistry.getWorkers().stream()
+                .anyMatch(w -> String.valueOf(w.port()).equals(workerPortId));
+
+        if(!workerAlive) return;
+
+        for (Job waitingJob : dagWaitingRoom.values()) {
+            if (waitingJob.getDependenciesIds() != null && waitingJob.getDependenciesIds().contains(parentId)) {
+                if(waitingJob.isAffinityRequired()){
+                    if (waitingJob.getPreferredWorkerId() == null) {
+                        waitingJob.setPreferredWorkerId(workerPortId);
+                        System.out.println("[AFFINITY] Child " + waitingJob.getId() + " locked to Parent's Node: " + workerPortId);
+                    }
+                }
+
+                System.out.println("[DAG] Setting Affinity for child " + waitingJob.getId() + " -> Worker " + workerPortId);
+            }
+        }
+    }
+
     private String executeJobRequest(Job job, Worker worker) throws Exception {
+        String rawPayload = job.getPayload();
+        String actualPayload = rawPayload;
+        worker.currentJobId = job.getId();
+
+        boolean isSystemCommand = rawPayload.startsWith("DEPLOY_PAYLOAD") ||
+                rawPayload.startsWith("RUN_PAYLOAD");
+
+        if (!isSystemCommand && rawPayload.contains("|")) {
+            // This handles "TEST|DataA" to "DataA"
+            actualPayload = rawPayload.split("\\|", 2)[1];
+        }
+
+//        System.out.println("[DEBUG] Dispatching Clean Payload: " + actualPayload);
+
         if (job.getPayload().startsWith("DEPLOY_PAYLOAD")) {
-            return executeDeploySequence(job, worker);
+            return executeDeploySequence(job, worker, actualPayload);
         } else if (job.getPayload().startsWith("RUN_PAYLOAD")) {
-            return executeRunOneOff(job, worker);
+            return executeRunOneOff(job, worker, actualPayload);
         }
         else {
-            return executeStandardTask(job, worker);
+            return executeStandardTask(job, worker, actualPayload);
         }
     }
 
-    private String executeStandardTask(Job job, Worker worker) throws Exception {
-        return sendExecuteCommand(worker, TitanProtocol.OP_RUN, job.getPayload());
+    private String executeStandardTask(Job job, Worker worker, String payload) throws Exception {
+        // NEW FORMAT: "JOB-123|calc.py"
+        String payloadWithId = job.getId() + "|" + payload;
+        return sendExecuteCommand(worker, TitanProtocol.OP_RUN, payloadWithId);
     }
 
-    private String executeDeploySequence(Job job, Worker worker) throws Exception {
-        String[] parts = job.getPayload().split("\\|", 4);
+    private String executeDeploySequence(Job job, Worker worker, String payload) throws Exception {
+        String[] parts = payload.split("\\|", 4);
         String filename = parts[1];
         String base64Script = parts[2];
 
@@ -322,6 +531,11 @@ public class Scheduler {
 
         // This will be passed only for the jar based deployment and not for python ones.
         String optionalPort = (parts.length > 3) ? parts[3] : "8085";
+
+        System.out.println("[DEPLOY] Checking if port " + optionalPort + " is free...");
+        if (isWorkerAlive(worker.host(), Integer.parseInt(optionalPort))) {
+            throw new RuntimeException("Deployment Rejected: Port " + optionalPort + " is ALREADY in use by another service.");
+        }
 
         // Step 1: Stage
         String stagePayload = filename + "|" + base64Script;
@@ -340,12 +554,31 @@ public class Scheduler {
         }
 
         String pid = startResp.contains("PID:") ? startResp.split("PID:")[1].trim() : "UNKNOWN";
+
+        // Give 2 seconds for the new worker to bind the socket (if its a worker)
+        Thread.sleep(2000);
+
+        if(!isWorkerAlive(worker.host(), Integer.parseInt(optionalPort))){
+            throw new RuntimeException("Deployment Failed: Process started (PID " + pid + ") but port " + optionalPort
+                    + " is unreachable.");
+        }
+
         liveServiceMap.put(job.getId(), worker);
+        // Since deploy tasks are synchronous (kind of) so we clear it off and say its completed.
+        worker.currentJobId = null;
         return "DEPLOYED_SUCCESS PID:" + pid;
     }
 
-    private String executeRunOneOff(Job job, Worker worker) throws Exception {
-        String[] parts = job.getPayload().split("\\|", 3);
+    private boolean isWorkerAlive(String host, int port) {
+        try (Socket s = new Socket(host, port)) {
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private String executeRunOneOff(Job job, Worker worker, String payload) throws Exception {
+        String[] parts = payload.split("\\|", 3);
         String filename = parts[1];
         String base64Script = parts[2];
 
@@ -357,16 +590,18 @@ public class Scheduler {
         }
         System.out.println("[OK] File Staged for Run");
 
-        // STEP 2: RUN AND WAIT
-        // Protocol: EXECUTE RUN_SCRIPT|filename
-        String runResp = sendExecuteCommand(worker, TitanProtocol.OP_RUN, filename);
+        // Use Async Run Protocol (this will run the script as a background and send status to scheduler from worker)
+        String payloadWithId = job.getId() + "|" + filename;
+        return sendExecuteCommand(worker, TitanProtocol.OP_RUN, payloadWithId);
 
-        // Worker returns: COMPLETED|0|Output...
-        if (!runResp.startsWith("COMPLETED")) {
-            throw new RuntimeException("Run failed: " + runResp);
-        }
-
-        return "RESULT: " + runResp;
+//        String runResp = sendExecuteCommand(worker, TitanProtocol.OP_RUN, filename);
+//
+//        // Worker returns: COMPLETED|0|Output...
+//        if (!runResp.startsWith("COMPLETED")) {
+//            throw new RuntimeException("Run failed: " + runResp);
+//        }
+//
+//        return "RESULT: " + runResp;
     }
 
     private String sendExecuteCommand(Worker worker, byte opCode, String payload) throws Exception {
@@ -382,9 +617,7 @@ public class Scheduler {
         if (!liveServiceMap.containsKey(serviceId)) {
             return "ERROR: Service " + serviceId + " not found in liveServiceMap. Current keys: " + liveServiceMap.keySet();
         }
-
         Worker targetWorker = liveServiceMap.get(serviceId);
-
         if (targetWorker == null) {
             return "ERROR: Service " + serviceId + " not found.";
         }
@@ -398,6 +631,44 @@ public class Scheduler {
         } catch (Exception e) {
             return "COMMUNICATION_ERROR: " + e.getMessage();
         }
+    }
+
+    public String shutdownWorkerNode(int targetPort){
+        Worker targetWorker = null;
+        for(Worker w: this.getWorkerRegistry().getWorkers()){
+            if(w.port() == targetPort){
+                targetWorker = w;
+                break;
+            }
+        }
+
+        if(targetWorker == null){
+            return "ERROR: Worker node " + targetPort + " not found in registry.";
+        }
+
+        System.out.println("[ADMIN] Initiating Graceful Shutdown for Worker " + targetPort);
+
+        List<String> servicesToStop = new java.util.ArrayList<>();
+
+        for(Map.Entry<String, Worker> entry: liveServiceMap.entrySet()){
+            if(entry.getValue().equals(targetWorker)){
+                servicesToStop.add(entry.getKey());
+            }
+        }
+
+        for (String serviceId : servicesToStop) {
+            System.out.println("[ADMIN] Stopping child service: " + serviceId);
+            stopRemoteService(serviceId);
+        }
+
+        // Send the Kill Command to the Worker
+        try {
+            schedulerClient.sendRequest(targetWorker.host(), targetWorker.port(), TitanProtocol.OP_RUN, "SHUTDOWN_WORKER|NOW");
+        } catch (Exception e) {
+            System.err.println("[WARN] Worker might have died before receiving ACK: " + e.getMessage());
+        }
+        workerRegistry.getWorkerMap().remove(targetWorker.host() + ":" + targetWorker.port());
+        return "SUCCESS: Worker " + targetPort + " and " + servicesToStop.size() + " services shut down.";
     }
 
     private void unlockChildren(String parentId){
@@ -418,8 +689,17 @@ public class Scheduler {
         for(Job job: dagWaitingRoom.values()){
             if(job.getDependenciesIds().contains(failedParentId)){
                 System.err.println("[ERROR] Cancelling Job " + job.getId() + " because parent " + failedParentId + " failed.");
+
                 job.setStatus(Job.Status.DEAD);
-                history.put(job.getId(), Job.Status.DEAD);
+                // Create a Ghost execution record so getJobStatus() returns DEAD
+                // We pass null for the worker because it never left the scheduler.
+                TaskExecution record = new TaskExecution(job.getId(), null);
+                record.status = Job.Status.DEAD;
+                record.endTime = System.currentTimeMillis(); // Died immediately
+                record.output = "Cancelled: Parent " + failedParentId + " failed";
+
+                executionHistory.put(job.getId(), record);
+
                 dagWaitingRoom.remove(job.getId());
                 this.deadLetterQueue.offer(job);
                 cancelChildren(job.getId());
@@ -489,6 +769,51 @@ public class Scheduler {
             json.append("{");
             json.append("\"port\": ").append(w.port()).append(",");
             json.append("\"load\": \"").append(w.getCurrentLoad()).append("/4\",");
+
+            if (w.currentJobId != null) {
+                json.append("\"active_job\": \"").append(w.currentJobId).append("\", ");
+            } else {
+                json.append("\"active_job\": null, ");
+            }
+
+            json.append("\"history\": [");
+            boolean hasRunningJob = false;
+
+            if (w.currentJobId != null) {
+                TaskExecution activeExec = executionHistory.get(w.currentJobId);
+                if (activeExec != null) {
+                    long duration = System.currentTimeMillis() - activeExec.startTime;
+                    json.append(String.format("{\"id\": \"%s\", \"status\": \"RUNNING\", \"time\": \"%dms\"}",
+                            w.currentJobId, duration));
+                    hasRunningJob = true;
+                }
+            }
+
+            String wKey = String.valueOf(w.port());
+            java.util.Deque<Job> history = workerRecentHistory.get(wKey);
+
+            // Check !isEmpty() to avoid printing a comma if there's no history to follow
+            if (history != null && !history.isEmpty()) {
+                // If we already printed a running job, we MUST add a comma before listing history
+                if (hasRunningJob) {
+                    json.append(",");
+                }
+
+                int hCount = 0;
+                for (Job j : history) {
+                    String duration = "N/A";
+                    TaskExecution exec = executionHistory.get(j.getId());
+                    if (exec != null) {
+                        duration = exec.getDuration() + "ms";
+                    }
+                    json.append(String.format("{\"id\": \"%s\", \"status\": \"%s\", \"time\": \"%s\"}",
+                            j.getId(), j.getStatus(), duration));
+                    if (hCount < history.size() - 1) json.append(",");
+                    hCount++;
+                }
+            }
+            json.append("],");
+
             json.append("\"services\": [");
 
             // Filter liveServiceMap for keys (Service IDs) belonging to this worker
@@ -518,7 +843,10 @@ public class Scheduler {
     }
 
     public Job.Status getJobStatus(String id) {
-        return history.getOrDefault(id, Job.Status.PENDING);
+        if (executionHistory.containsKey(id)) {
+            return executionHistory.get(id).status;
+        }
+        return Job.Status.PENDING;
     }
 
     public void stop(){

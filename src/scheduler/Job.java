@@ -22,6 +22,9 @@ public class Job implements Comparable<Job> {
     private List<String> dependenciesIds = null;
     private Set<String> satisfiedDeps = null;
 
+    private String preferredWorkerId;
+    private boolean affinityRequired = false;
+
     public Job(String payload) {
         this(payload, PRIORITY_NORMAL, 0);
     }
@@ -67,54 +70,18 @@ public class Job implements Comparable<Job> {
         }
     }
 
-//    public static Job fromDagString(String jobStr) {
-//        String cleanedStr = jobStr.trim();
-//        String[] p = cleanedStr.split("\\|");
-//
-//        // 1. Basic Validation
-//        if (p.length < 6) throw new IllegalArgumentException("Invalid DAG job format");
-//
-//        String id = p[0].trim();
-//        String type = p[1].trim();
-//        String data = p[2].trim(); // This might be filename OR generic data (like EMAIL)
-//
-//        String port = "";
-//        int prioIndex = 3;
-//
-//        // Only look for a 7th column (Port) if it is a DEPLOY command
-//        if (type.equalsIgnoreCase("DEPLOY") && p.length == 7) {
-//            port = p[3].trim();
-//            prioIndex = 4; // Shift indices right
-//        }
-//
-//        // Extract remaining numeric fields
-//        int priority = Integer.parseInt(p[prioIndex].trim());
-//        long delay = Long.parseLong(p[prioIndex + 1].trim());
-//
-//        // Parse Dependencies
-//        String depRawStr = p[prioIndex + 2].replace("[", "").replace("]", "").trim();
-//        List<String> deps = (depRawStr.isEmpty()) ? null :
-//                java.util.Arrays.stream(depRawStr.split(","))
-//                        .map(String::trim).toList();
-//
-//        // Construct Payload
-//        String finalPayload;
-//        if (type.equalsIgnoreCase("RUN") || type.equalsIgnoreCase("DEPLOY")) {
-//            // ONLY these types trigger File I/O and Base64 encoding
-//            finalPayload = constructFilePayload(type, data, port);
-//        } else {
-//            // For everything else (EMAIL, PDF_CONVERT), just pass the data as-is
-//            finalPayload = type + "|" + data;
-//        }
-//
-//        return new Job(id, finalPayload, priority, delay, deps);
-//    }
-
     public static Job fromDagString(String jobStr) {
         String raw = jobStr.trim();
-
+        boolean isAffinityRequired = false;
         try {
             // STRATEGY: Parse from the OUTSIDE IN to handle variable pipes in the payload.
+
+            // STEP 0: Parse the Affinity or sticky flag first and then strip that part and proceed with previous normal string
+            if (raw.endsWith("|AFFINITY") || raw.endsWith("|STICKY")) {
+                isAffinityRequired = true;
+                int lastPipe = raw.lastIndexOf('|');
+                raw = raw.substring(0, lastPipe).trim(); // Strip the flag off
+            }
 
             // --- STEP 1: RIGHT SIDE (Metadata) ---
 
@@ -165,8 +132,10 @@ public class Job implements Comparable<Job> {
                 }
             }
 
-            Job job = new Job(id, finalPayload, priority, delay, deps);
-//            job.setRequiredSkill(skill); // Ensure your Job class has this setter!
+//            Job job = new Job(id, finalPayload, priority, delay, deps);
+            Job job = new Job(id, skill + "|" + finalPayload, priority, delay, deps);
+            job.setAffinityRequired(isAffinityRequired);
+//            job.setRequiredSkill(skill);
             return job;
 
         } catch (Exception e) {
@@ -242,4 +211,12 @@ public class Job implements Comparable<Job> {
     public String toString() {
         return String.format("[%s] Job %s (Retries: %d)", status, id, retryCount);
     }
+
+    public void setPreferredWorkerId(String preferredWorkerId){this.preferredWorkerId = preferredWorkerId;}
+
+    public String getPreferredWorkerId(){return this.preferredWorkerId;}
+
+    public void setAffinityRequired(boolean isAffinityRequired){this.affinityRequired=isAffinityRequired;}
+    public Boolean isAffinityRequired(){return this.affinityRequired;}
+
 }

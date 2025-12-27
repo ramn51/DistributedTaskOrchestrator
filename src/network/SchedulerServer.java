@@ -226,6 +226,18 @@ public class SchedulerServer {
                 scheduler.submitJob(payload);
                 return "JOB_ACCEPTED";
 
+            case TitanProtocol.OP_KILL_WORKER:
+                try {
+                    int targetPort = Integer.parseInt(payload);
+                    return scheduler.shutdownWorkerNode(targetPort);
+                } catch (NumberFormatException e) {
+                    return "ERROR: Invalid Port Format";
+                }
+
+            case TitanProtocol.OP_JOB_COMPLETE:
+                scheduler.handleJobCallback(payload);
+                return "ACK_CALLBACK";
+
 
             default:
                 return "UNKNOWN_OPCODE: " + packet.opCode;
