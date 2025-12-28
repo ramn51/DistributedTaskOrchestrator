@@ -68,8 +68,15 @@ public class TitanCLI {
         }
         else if (input.startsWith("deploy ")) {
             // Input: "deploy worker.jar"
+            String[] args = input.substring(7).trim().split("\\s+");
+            String filename = args[0];
+            String targetPort = "";
+
+            if (args.length > 1) {
+                targetPort = args[1];
+            }
+            payload = filename + "|" + targetPort;
             opCode = TitanProtocol.OP_DEPLOY;
-            payload = input.substring(7);
         }
         else if (input.startsWith("stop ")) {
             opCode = TitanProtocol.OP_STOP;

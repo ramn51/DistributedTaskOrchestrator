@@ -116,8 +116,8 @@ public class SchedulerServer {
             Job job = new Job("TEMP_PAYLOAD", 1, 0);
             String internalId = job.getId();
 
-            if (port == null || port.trim().isEmpty()) {
-                port = "8085"; // Default if not specified
+            if ((port == null || port.trim().isEmpty()) && fileName.equalsIgnoreCase("Worker.jar")) {
+                port = "8085";
             }
 
             // If it's a Worker, we include the port in the ID for easy matching later
