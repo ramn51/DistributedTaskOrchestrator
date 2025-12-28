@@ -46,22 +46,46 @@ public class ServiceHandler implements TaskHandler {
             return "ERROR: File not found at " + scriptFile.getAbsolutePath();
         }
 
-        if (fileName.endsWith(".jar")) {
-            String javaHome = System.getProperty("java.home");
-            String javaBin = javaHome + File.separator + "bin" + File.separator + "java";
-            if (System.getProperty("os.name").toLowerCase().contains("win")) {
-                javaBin += ".exe";
-            }
+        boolean isWorkerJar = fileName.equalsIgnoreCase("Worker.jar");
 
-            System.out.println("JAVA RUNTIME ::::" + javaBin);
-            // To run a jar: java -jar <path>
-            return launchDetachedProcess(serviceId, javaBin, "-jar", scriptFile.getAbsolutePath(), port);
-        } else if (fileName.endsWith(".py")) {
-            return launchDetachedProcess(serviceId, "python", scriptFile.getAbsolutePath());
-        } else {
-            // Default to trying to execute it directly (e.g. binaries or .sh)
-            return launchDetachedProcess(serviceId, scriptFile.getAbsolutePath());
+        if (isWorkerJar) {
+            try {
+                String javaBin = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
+                if (System.getProperty("os.name").toLowerCase().contains("win")) javaBin += ".exe";
+
+                // We use the absolute path to the JAR we just staged in titan_workspace
+                String jarPath = scriptFile.getAbsolutePath();
+
+                ProcessBuilder pb;
+                if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                    // Windows Detached: cmd /c start /b java -jar Worker.jar <port>
+                    pb = new ProcessBuilder("cmd", "/c", "start", "/b", javaBin, "-jar", "\"" + jarPath + "\"", port);
+                } else {
+                    // Linux Detached: nohup java -jar Worker.jar <port> &
+                    pb = new ProcessBuilder("nohup", javaBin, "-jar", jarPath, port, "&");
+                }
+
+                pb.redirectOutput(ProcessBuilder.Redirect.appendTo(new File(WORKSPACE_DIR + "/worker_" + port + ".log")));
+                pb.redirectError(ProcessBuilder.Redirect.appendTo(new File(WORKSPACE_DIR + "/worker_" + port + "_error.log")));
+                pb.redirectInput(ProcessBuilder.Redirect.from(new File(System.getProperty("os.name").contains("Win") ? "NUL" : "/dev/null")));
+
+                pb.directory(new File(WORKSPACE_DIR));
+
+                pb.start();
+
+                System.out.println("[DEBUG] Launched Detached JAR: " + jarPath + " on port " + port);
+                return "DEPLOYED_SUCCESS | ID: " + serviceId + " | PID: DETACHED";
+            } catch (IOException e) {
+                return "LAUNCH_ERROR: " + e.getMessage();
+            }
+        } else{
+            if (fileName.endsWith(".py")) {
+                return launchDetachedProcess(serviceId, "python", scriptFile.getAbsolutePath());
+            } else {
+                return launchDetachedProcess(serviceId, scriptFile.getAbsolutePath());
+            }
         }
+
     }
 
     private String launchDetachedProcess(String serviceId, String... command) {

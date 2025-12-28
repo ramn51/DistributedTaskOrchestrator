@@ -1,6 +1,5 @@
 package scheduler;
 
-
 import network.RpcClient;
 import network.SchedulerServer;
 import network.TitanProtocol;
@@ -151,26 +150,24 @@ public class Scheduler {
         System.out.println("[DEBUG] Attempting promotion for incoming worker at " + host + ":" + port);
 
         liveServiceMap.entrySet().removeIf(entry -> {
-            String serviceId = entry.getKey();
-            Worker hostWorker = entry.getValue();
+                    String serviceId = entry.getKey();
+                    boolean idMatches = serviceId.startsWith("WRK-" + port + "-");
 
-            // Debug prints to see why it's failing
-            if (serviceId.startsWith("WRK-")) {
-                System.out.println("[DEBUG] Checking Service: " + serviceId +
-                        " | HostWorker Port: " + hostWorker.port() +
-                        " | Target Port: " + port);
-            }
+                    if (idMatches) {
+                        System.out.println("[PROMOTION] Job " + serviceId + " converted to Peer.");
 
-            // The Fix: Only check the ID string, because the 'hostWorker'
-            // in the map is the PARENT, not the new worker.
-            boolean idMatches = serviceId.startsWith("WRK-" + port + "-");
+                        // 2. Find the Parent who was working on this and set them to Idle
+                        for (Worker w : workerRegistry.getWorkers()) {
+                            if (serviceId.equals(w.currentJobId)) {
+                                w.currentJobId = null; // Parent is now free!
+                                System.out.println("[DEBUG] Parent Worker " + w.port() + " is now IDLE.");
+                            }
+                        }
+                        return true;
+                    }
 
-            if (idMatches) {
-                System.out.println("[INFO] Promotion Success: " + serviceId + " is now a Peer.");
-                return true;
-            }
-            return false;
-        });
+                return false; // Removes "WRK-..." from the parent's Running Services list
+            });
     }
 
     public Map<String, Job> getDAGWaitingRoom(){
@@ -529,12 +526,22 @@ public class Scheduler {
 
         System.out.println("SCHEDULER LOGS::ARGS PASSED TO DEPLOY EXEC " + parts.length);
 
-        // This will be passed only for the jar based deployment and not for python ones.
-        String optionalPort = (parts.length > 3) ? parts[3] : "8085";
+        String portString = (parts.length > 3) ? parts[3] : null;
+        int targetPort = -1;
+        if (portString != null && !portString.isEmpty()) {
+            // If User explicitly provided a port, need to verify this
+            targetPort = Integer.parseInt(portString);
+        } else if (filename.contains("Worker.jar")) {
+            // It's a Worker, but no port provided -> Default to 8085
+            targetPort = 8085;
+            portString = "8085";
+        }
 
-        System.out.println("[DEPLOY] Checking if port " + optionalPort + " is free...");
-        if (isWorkerAlive(worker.host(), Integer.parseInt(optionalPort))) {
-            throw new RuntimeException("Deployment Rejected: Port " + optionalPort + " is ALREADY in use by another service.");
+        if (targetPort != -1) {
+            System.out.println("[DEPLOY] Checking if port " + targetPort + " is free...");
+            if (isWorkerAlive(worker.host(), targetPort)) {
+                throw new RuntimeException("Deployment Rejected: Port " + targetPort + " is ALREADY in use by another service.");
+            }
         }
 
         // Step 1: Stage
@@ -546,7 +553,8 @@ public class Scheduler {
         System.out.println("[OK] File Staged");
 
         // Step 2: Start
-        String startPayload = filename + "|" + job.getId() + "|" + optionalPort;
+        String safePortArg = (portString != null) ? portString : "0";
+        String startPayload = filename + "|" + job.getId() + "|" + safePortArg;
 
         String startResp = sendExecuteCommand(worker, TitanProtocol.OP_START_SERVICE, startPayload);
         if (!startResp.contains("DEPLOYED_SUCCESS")) {
@@ -555,12 +563,15 @@ public class Scheduler {
 
         String pid = startResp.contains("PID:") ? startResp.split("PID:")[1].trim() : "UNKNOWN";
 
-        // Give 2 seconds for the new worker to bind the socket (if its a worker)
-        Thread.sleep(2000);
-
-        if(!isWorkerAlive(worker.host(), Integer.parseInt(optionalPort))){
-            throw new RuntimeException("Deployment Failed: Process started (PID " + pid + ") but port " + optionalPort
-                    + " is unreachable.");
+        if (targetPort != -1) {
+            System.out.println("[DEPLOY] Verifying liveness on port " + targetPort + "...");
+            Thread.sleep(8000);
+            if (!isWorkerAlive(worker.host(), targetPort)) {
+                throw new RuntimeException("Deployment Failed: Process started (PID " + pid + ") but port " + targetPort
+                        + " is unreachable.");
+            }
+        } else {
+            System.out.println("[DEPLOY] Generic service started (PID " + pid + "). Skipping network verification.");
         }
 
         liveServiceMap.put(job.getId(), worker);
