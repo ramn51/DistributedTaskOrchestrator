@@ -3,10 +3,7 @@ package scheduler.tasks;
 import network.RpcWorkerServer;
 import scheduler.TaskHandler;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
@@ -53,15 +50,23 @@ public class ScriptExecutorHandler implements TaskHandler {
             StringBuilder finalOutput = new StringBuilder();
 
             Thread streamer = new Thread(() -> {
-               try(BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream()))){
-                   String line;
+                File logFile = new File(WORKSPACE_DIR, jobId + ".log");
+               try(BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                   BufferedWriter fileWriter = new BufferedWriter(new FileWriter(logFile, true))){
 
-                   while((line = bufferedReader.readLine())!=null){
-                        parentServer.streamLogToMaster(jobId, line);
-                       synchronized (finalOutput) {
-                           finalOutput.append(line).append("\n");
+                       String line;
+
+                       while ((line = bufferedReader.readLine()) != null) {
+                           parentServer.streamLogToMaster(jobId, line);
+
+                           fileWriter.write(line);
+                           fileWriter.newLine();
+                           fileWriter.flush();
+
+                           synchronized (finalOutput) {
+                               finalOutput.append(line).append("\n");
+                           }
                        }
-                   }
                }catch (IOException e) { /* Stream ended */ }
             });
 
