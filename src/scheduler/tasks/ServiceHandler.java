@@ -4,9 +4,7 @@ import network.RpcWorkerServer;
 import network.TitanProtocol;
 import scheduler.TaskHandler;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -73,6 +71,7 @@ public class ServiceHandler implements TaskHandler {
 
                 pb.start();
 
+
                 System.out.println("[DEBUG] Launched Detached JAR: " + jarPath + " on port " + port);
                 return "DEPLOYED_SUCCESS | ID: " + serviceId + " | PID: DETACHED";
             } catch (IOException e) {
@@ -97,12 +96,32 @@ public class ServiceHandler implements TaskHandler {
             ProcessBuilder pb = new ProcessBuilder(command);
 
             // 2. Separate Logs (Crucial for debugging background jobs)
-            File logFile = new File(WORKSPACE_DIR, serviceId + ".log");
-            pb.redirectOutput(logFile);
-            pb.redirectError(logFile);
+//            File logFile = new File(WORKSPACE_DIR, serviceId + ".log");
+//            pb.redirectOutput(logFile);
+//            pb.redirectError(logFile);
+            pb.redirectErrorStream(true);
 
             // 3. START (Async/Detached)
             Process process = pb.start();
+
+            new Thread(() -> {
+                File logFile = new File(WORKSPACE_DIR, serviceId + ".log");
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                     FileWriter fw = new FileWriter(logFile, true)) { // 'true' for append mode
+
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        // Save to local disk History
+                        fw.write(line + System.lineSeparator());
+                        fw.flush();
+
+                        // Stream to Master (Real-time)
+                        parentServer.streamLogToMaster(serviceId, line);
+                    }
+                } catch (IOException e) {
+                    System.out.println("[STREAM END] " + serviceId + " finished.");
+                }
+            }).start();
 
             // 4. Register in Memory Map
             runningServices.put(serviceId, process);

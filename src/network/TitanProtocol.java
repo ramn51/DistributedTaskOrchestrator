@@ -24,6 +24,8 @@ public class TitanProtocol {
     public static final byte OP_START_SERVICE     = 0x0D;
     public static final byte OP_KILL_WORKER       = 0x11;
     public static final byte OP_JOB_COMPLETE      = 0x12;
+    public static final byte OP_LOG_STREAM        = 0x15;
+    public static final byte OP_GET_LOGS         = 0x16;
 
     // --- RESPONSE OPCODES ---
     public static final byte OP_ACK               = 0x50; // Success

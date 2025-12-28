@@ -48,7 +48,7 @@ public class RpcWorkerServer {
         taskHanlderMap.put("STAGE_FILE", new FileHandler());
         taskHanlderMap.put("START_SERVICE", new ServiceHandler("START", this));
         taskHanlderMap.put("STOP_SERVICE", new ServiceHandler("STOP", this));
-        taskHanlderMap.put("RUN_SCRIPT", new ScriptExecutorHandler());
+        taskHanlderMap.put("RUN_SCRIPT", new ScriptExecutorHandler(this));
 
         taskHanlderMap.put("DEPLOY_PAYLOAD", new FileHandler());
 
@@ -265,7 +265,13 @@ public class RpcWorkerServer {
             try {
                 System.out.println("[ASYNC] Starting job "+ jobId + ": " + taskData);
                 TaskHandler handler = taskHanlderMap.get("RUN_SCRIPT");
-                String result = handler.execute(taskData);
+
+                // RE-INJECT ID for the Handler
+                // We combine them so ScriptExecutorHandler gets "calc.py | JOB-123"
+                String payloadForHandler = taskData + "|" + jobId;
+
+
+                String result = handler.execute(payloadForHandler);
                 // This allows the worker to handle PDF_CONVERT or any other key
 //                String result = processCommand(taskData);
 
@@ -312,6 +318,13 @@ public class RpcWorkerServer {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public void streamLogToMaster(String jobId, String line){
+        try (Socket socket = new Socket(this.schedulerHost, this.schedulerPort);
+             DataOutputStream out = new DataOutputStream(socket.getOutputStream())) {
+            TitanProtocol.send(out, TitanProtocol.OP_LOG_STREAM, jobId + "|" + line);
+        } catch (Exception e) { /* ignore */ }
     }
 
     public void stop(){

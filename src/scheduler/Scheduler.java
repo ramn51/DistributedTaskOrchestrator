@@ -45,6 +45,10 @@ public class Scheduler {
     // Remember bad ports for avoiding during scaling
     private final Set<Integer> portBlacklist = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
+    // This is related to log streaming
+    private final Map<String, List<String>> liveLogBuffer = new ConcurrentHashMap<>();
+    private static final int MAX_LOG_LINES = 1000;
+
     public Scheduler(int port){
         workerRegistry = new WorkerRegistry();
         schedulerClient = new RpcClient(workerRegistry);
@@ -839,6 +843,26 @@ public class Scheduler {
                 cancelChildren(job.getId());
             }
         }
+    }
+
+    // Methods for sending the logs to stream to the UI
+    public void logStream(String jobId, String line){
+        liveLogBuffer.computeIfAbsent(jobId, k ->  Collections.synchronizedList(new ArrayList<>()));
+        List<String> logs = liveLogBuffer.get(jobId);
+
+        synchronized (logs){
+            if(logs.size() >= MAX_LOG_LINES){
+                logs.remove(0);
+            }
+            logs.add(line);
+        }
+
+//        System.out.println("[STREAM][" + jobId + "] " + line);
+    }
+
+    // Helper method for the UI to retrieve the logs
+    public List<String> getLogs(String jobId) {
+        return liveLogBuffer.getOrDefault(jobId, new ArrayList<>());
     }
 
     public String getSystemStats() {

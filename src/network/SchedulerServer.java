@@ -150,6 +150,11 @@ public class SchedulerServer {
             if (!file.exists()) {
                 return "ERROR: File not found in " + PERM_FILES_DIR;
             }
+
+            Job job = new Job("TEMP", 1, 0);
+            String fullJobId = "TSK-" + job.getId();
+            job.setId(fullJobId);
+
             byte[] fileBytes = Files.readAllBytes(file.toPath());
             String base64Content = Base64.getEncoder().encodeToString(fileBytes);
 
@@ -157,9 +162,10 @@ public class SchedulerServer {
 
             String payload = "RUN_PAYLOAD|" + fileName + "|" + base64Content;
             // Payload: RUN_PAYLOAD|filename|base64
-            Job job = new Job(payload, 1, 0);
+//            Job job = new Job(payload, 1, 0);
+            job.setPayload(payload);
             scheduler.submitJob(job);
-            return "JOB_QUEUED";
+            return "JOB_QUEUED" + fullJobId;
         } catch (IOException e) {
             e.printStackTrace();
             return "ERROR: Server File IO issue";
@@ -237,6 +243,21 @@ public class SchedulerServer {
             case TitanProtocol.OP_JOB_COMPLETE:
                 scheduler.handleJobCallback(payload);
                 return "ACK_CALLBACK";
+
+            case TitanProtocol.OP_LOG_STREAM:
+                // Payload format: "jobId|logLine"
+                // Split into 2 parts max so the log message can contain pipes safely
+                String[] logParts = payload.split("\\|", 2);
+                if (logParts.length == 2) {
+                    scheduler.logStream(logParts[0], logParts[1]);
+                }
+                return "ACK_LOG"; // send back an ack
+
+            case TitanProtocol.OP_GET_LOGS:
+                // Payload is the jobId in this case
+                String jobId = payload;
+                List<String> logs = scheduler.getLogs(jobId);
+                return String.join("\n", logs);
 
 
             default:
