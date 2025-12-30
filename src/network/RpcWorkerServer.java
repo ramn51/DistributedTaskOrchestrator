@@ -106,7 +106,19 @@ public class RpcWorkerServer {
                     TitanProtocol.TitanPacket packet = TitanProtocol.read(in);
 
                     if (packet.opCode == TitanProtocol.OP_HEARTBEAT) {
-                        String stats = "PONG|" + activeJobs.get() + "|" + MAX_THREADS;
+
+                        int activeThreads = 0;
+                        int maxThreads = 4;
+
+                        if(this.workerPool !=null){
+                            if (this.workerPool instanceof java.util.concurrent.ThreadPoolExecutor) {
+                                activeThreads = ((java.util.concurrent.ThreadPoolExecutor) this.workerPool).getActiveCount();
+                            } else{
+                                activeThreads = activeJobs.get();
+                            }
+                        }
+
+                        String stats = "PONG|" + activeThreads + "|" + maxThreads;
                         TitanProtocol.send(out, TitanProtocol.OP_ACK, stats);
 
                     } else if (packet.opCode == TitanProtocol.OP_STAGE) {

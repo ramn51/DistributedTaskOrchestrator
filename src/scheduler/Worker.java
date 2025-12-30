@@ -26,13 +26,14 @@ public class Worker {
         this.lastSeen = System.currentTimeMillis();
         this.currentLoad = 0;
         maxCap = 4;
+        this.idleStartTime = System.currentTimeMillis();
     }
 
-    public void updateLastSeen() {
+    public synchronized void updateLastSeen() {
         this.lastSeen = System.currentTimeMillis();
     }
 
-    public void setCurrentLoad(int load) {
+    public synchronized void setCurrentLoad(int load) {
         this.currentLoad = load;
         if (load == 0) {
             if (this.idleStartTime == -1) {
@@ -44,12 +45,20 @@ public class Worker {
         }
     }
 
+    public synchronized void setMaxCap(int maxCap){
+        this.maxCap = maxCap;
+    }
+
+    public synchronized int getMaxCap(){
+        return this.maxCap;
+    }
+
     public long getIdleDuration() {
         if (idleStartTime == -1) return 0;
         return System.currentTimeMillis() - idleStartTime;
     }
 
-    public int getCurrentLoad() {
+    public synchronized int getCurrentLoad() {
         return currentLoad;
     }
 
@@ -61,10 +70,14 @@ public class Worker {
         if(this.currentLoad > 0){
             this.currentLoad--;
         }
+
+        if (this.currentLoad == 0) {
+            this.idleStartTime = System.currentTimeMillis();
+        }
     }
 
-    public boolean isSaturated(){
-        return getCurrentLoad() == maxCap;
+    public synchronized boolean isSaturated(){
+        return getCurrentLoad() >= maxCap;
     }
 
     public String host() { return host; }

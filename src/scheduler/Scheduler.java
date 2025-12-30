@@ -142,7 +142,7 @@ public class Scheduler {
             boolean allSaturated = workers.stream().allMatch(Worker::isSaturated);
             int totalCount = workers.size();
             int totalUsedSlots = workers.stream().mapToInt(Worker::getCurrentLoad).sum();
-            int totalAvailableSlots = totalCount * 4;
+            int totalAvailableSlots = workers.stream().mapToInt(Worker::getMaxCap).sum();;
             System.out.println("[SCALER] Cluster Pressure: " + totalUsedSlots + "/" + totalAvailableSlots);
 
             if (allSaturated && totalCount < MAX_WORKERS){
@@ -170,10 +170,13 @@ public class Scheduler {
 
             // For scale down
             // Only scale down if the WHOLE cluster is idle and we have more than 1 worker
+            Set<Worker> serviceHosts = new HashSet<>(liveServiceMap.values());
+
             if (!allSaturated && totalCount > 1) {
                 Worker idleTarget = workers.stream()
                         .filter(w -> w.port() != 8080) // Never kill the root
                         .filter(w -> w.getCurrentLoad() == 0) // Must be doing nothing
+                        .filter(w -> !serviceHosts.contains(w)) // Don't kill if hosting a Service
                         .filter(w -> w.getIdleDuration() > 45000) // Idle for > 45 seconds
                         .max(java.util.Comparator.comparingInt(Worker::port)) // Kill highest port first
                         .orElse(null);
@@ -234,6 +237,10 @@ public class Scheduler {
                     if(load > 0){
                         System.out.println("Worker " + worker.port() + "Has load" + worker.getCurrentLoad());
                     }
+                }
+                if (parts.length > 2) {
+                    int maxCapacity = Integer.parseInt(parts[2]);
+                    worker.setMaxCap(maxCapacity);
                 }
                 workerRegistry.updateLastSeen(worker.host(), worker.port());
             }
@@ -882,7 +889,7 @@ public class Scheduler {
             sb.append("Worker Status:\n");
             for (Worker w : workerRegistry.getWorkers()) {
                 int current = w.getCurrentLoad();
-                int max = 4; // Assuming your MAX_THREADS is 4, adjust as needed
+                int max = w.getMaxCap(); // Assuming your MAX_THREADS is 4, adjust as needed
                 String loadStr = String.format("%d/%d (%d%%)", current, max, (current * 100 / max));
 
                 sb.append(String.format(" • [%d] Load: %-12s | Skills: %s\n",
@@ -926,7 +933,7 @@ public class Scheduler {
         for (Worker w : safeWorkerList) {
             json.append("{");
             json.append("\"port\": ").append(w.port()).append(",");
-            json.append("\"load\": \"").append(w.getCurrentLoad()).append("/4\",");
+            json.append("\"load\": \"").append(w.getCurrentLoad()).append("/").append(w.getMaxCap()).append("\",");
 
             if (w.currentJobId != null) {
                 json.append("\"active_job\": \"").append(w.currentJobId).append("\", ");
