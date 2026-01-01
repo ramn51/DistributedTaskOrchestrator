@@ -16,9 +16,14 @@ Titan provides a streamlined environment for diverse workloads:
 *Built as a systems engineering initiative, Titan explores the "hard parts" of distributed computing—custom RPC protocols, consensus, and state management—implemented from scratch in Java with **zero external dependencies**.*
 
 ## 🖥️ Dashboard
+
 <p align="center">
+
   <img src="screenshots/UI_Screenshot.png" alt="Main Dashboard View" width="45%" style="margin-right: 10px;"/>
+
 </p>
+
+![Titan Dashboard]("screenshots/UI_Screenshot.png")
 
 *Visualizes real-time node health, execution history, and allows direct log streaming from workers.*
 

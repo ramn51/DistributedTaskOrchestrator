@@ -122,18 +122,31 @@ public class Job implements Comparable<Job> {
             String finalPayload = temp.substring(secondPipe + 1).trim();
 
             // --- STEP 4: CONSTRUCT JOB ---
+            // 1. Auto-Prefix the ID (if not already present)
+            // This ensures "GEN_LOGIC" becomes "DAG-GEN_LOGIC"
+            String dagId = id.startsWith("DAG-") ? id : "DAG-" + id;
 
             // Parse dependencies string "[A,B]" -> List<String>
+            // 2. Auto-Prefix the Dependencies
+            // IMPORTANT: If Job A is renamed "DAG-A", Job B must depend on "DAG-A", not "A".
             String cleanParents = parentsStr.replace("[", "").replace("]", "").trim();
             java.util.List<String> deps = new java.util.ArrayList<>();
             if (!cleanParents.isEmpty()) {
                 for (String p : cleanParents.split(",")) {
-                    deps.add(p.trim());
+                    String cleanP = p.trim();
+                    if(!cleanP.isEmpty()){
+                        // Prefix the dependency ID too
+                        deps.add(cleanP.startsWith("DAG-") ? cleanP : "DAG-" + cleanP);
+                    }
                 }
+//                for (String p : cleanParents.split(",")) {
+//                    deps.add(p.trim());
+//                }
             }
 
 //            Job job = new Job(id, finalPayload, priority, delay, deps);
-            Job job = new Job(id, skill + "|" + finalPayload, priority, delay, deps);
+            String payloadWithId = finalPayload + "|" + dagId;
+            Job job = new Job(dagId, skill + "|" + payloadWithId, priority, delay, deps);
             job.setAffinityRequired(isAffinityRequired);
 //            job.setRequiredSkill(skill);
             return job;

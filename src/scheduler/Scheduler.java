@@ -595,16 +595,28 @@ public class Scheduler {
         boolean isSystemCommand = rawPayload.startsWith("DEPLOY_PAYLOAD") ||
                 rawPayload.startsWith("RUN_PAYLOAD");
 
-        if (!isSystemCommand && rawPayload.contains("|")) {
-            // This handles "TEST|DataA" to "DataA"
-            actualPayload = rawPayload.split("\\|", 2)[1];
+//        if (!isSystemCommand && rawPayload.contains("|")) {
+//            // This handles "TEST|DataA" to "DataA"
+//            actualPayload = rawPayload.split("\\|", 2)[1];
+//        }
+
+        // This handles the case with DAG request to get the next potential command
+        // 1. STRIP THE SKILL PREFIX (e.g. "GENERAL|RUN_..." -> "RUN_...")
+        // We look for the first pipe. If the second part looks like a command, we use that.
+        if (rawPayload.contains("|")) {
+            String[] parts = rawPayload.split("\\|", 2);
+            String potentialCommand = parts[1];
+
+            if (potentialCommand.startsWith("DEPLOY_PAYLOAD") || potentialCommand.startsWith("RUN_PAYLOAD")) {
+                actualPayload = potentialCommand;
+            }
         }
 
 //        System.out.println("[DEBUG] Dispatching Clean Payload: " + actualPayload);
 
-        if (job.getPayload().startsWith("DEPLOY_PAYLOAD")) {
+        if (actualPayload.startsWith("DEPLOY_PAYLOAD")) {
             return executeDeploySequence(job, worker, actualPayload);
-        } else if (job.getPayload().startsWith("RUN_PAYLOAD")) {
+        } else if (actualPayload.startsWith("RUN_PAYLOAD")) {
             return executeRunOneOff(job, worker, actualPayload);
         }
         else {
@@ -620,7 +632,11 @@ public class Scheduler {
 
     private String executeDeploySequence(Job job, Worker worker, String payload) throws Exception {
         try {
-            String[] parts = payload.split("\\|", 4);
+//            String[] parts = payload.split("\\|", 4);
+            String[] parts = payload.split("\\|");
+
+            // Format: DEPLOY_PAYLOAD | filename | base64 | port | [DAG-ID]
+            // DAG-ID is only if its a DAG job
             String filename = parts[1];
             String base64Script = parts[2];
 
@@ -639,7 +655,14 @@ public class Scheduler {
             int targetPort = -1;
             if (portString != null && !portString.isEmpty()) {
                 // If User explicitly provided a port, need to verify this
-                targetPort = Integer.parseInt(portString);
+                try {
+                    targetPort = Integer.parseInt(portString);
+                } catch (NumberFormatException e) {
+                    // It wasn't a number (it was likely the DAG-ID).
+                    // This means no port was provided. Default to 8085.
+                    targetPort = 8085;
+                    portString = "8085";
+                }
             } else if (filename.contains("Worker.jar")) {
                 // It's a Worker, but no port provided -> Default to 8085
                 targetPort = 8085;
@@ -723,9 +746,30 @@ public class Scheduler {
     }
 
     private String executeRunOneOff(Job job, Worker worker, String payload) throws Exception {
-        String[] parts = payload.split("\\|", 3);
+        String[] parts = payload.split("\\|");
+
+        if(parts.length < 3) throw new RuntimeException("Invalid Run Payload");
+
         String filename = parts[1];
+        String args = "";
         String base64Script = parts[2];
+
+        if (parts.length == 3) {
+            // OLD FORMAT (No args)
+            // Format: TYPE | FILENAME | BASE64
+            filename = parts[1];
+            base64Script = parts[2];
+        }
+        else if (parts.length >= 4) {
+            // NEW FORMAT (With args)
+            // Format: TYPE | FILENAME | ARGS | BASE64
+            filename = parts[1];
+            args = parts[2];
+            base64Script = parts[3];
+        }
+        else {
+            throw new RuntimeException("Invalid Run Payload Length: " + parts.length);
+        }
 
         // STEP 1: STAGE (Same as Deploy)
 //        String stageResp = sendExecuteCommand(worker, TitanProtocol.OP_DEPLOY, "STAGE_FILE|" + filename + "|" + base64Script);
@@ -736,17 +780,9 @@ public class Scheduler {
         System.out.println("[OK] File Staged for Run");
 
         // Use Async Run Protocol (this will run the script as a background and send status to scheduler from worker)
-        String payloadWithId = job.getId() + "|" + filename;
+        String payloadWithId = job.getId() + "|" + filename + "|" + args;
+//        String runPayload = "RUN_PAYLOAD|" + filename + "|" + job.getId();
         return sendExecuteCommand(worker, TitanProtocol.OP_RUN, payloadWithId);
-
-//        String runResp = sendExecuteCommand(worker, TitanProtocol.OP_RUN, filename);
-//
-//        // Worker returns: COMPLETED|0|Output...
-//        if (!runResp.startsWith("COMPLETED")) {
-//            throw new RuntimeException("Run failed: " + runResp);
-//        }
-//
-//        return "RESULT: " + runResp;
     }
 
     private String sendExecuteCommand(Worker worker, byte opCode, String payload) throws Exception {

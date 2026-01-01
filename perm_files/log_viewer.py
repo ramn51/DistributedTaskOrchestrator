@@ -1,6 +1,7 @@
 from flask import Flask, render_template_string, request
 import socket
 import struct
+import sys
 
 app = Flask(__name__)
 
@@ -131,5 +132,17 @@ def get_logs():
     return fetch_logs_from_titan(job_id)
 
 if __name__ == "__main__":
-    print("Starting Titan UI on http://localhost:5000")
-    app.run(port=5000, debug=True)
+    # DEFAULT to 9991 if no argument provided
+        port = 9991
+
+        # Check if Titan sent a port argument (sys.argv[1])
+        if len(sys.argv) > 1:
+            try:
+                port = int(sys.argv[1])
+            except ValueError:
+                print(f"Invalid port argument: {sys.argv[1]}, defaulting to {port}")
+
+        print(f"Starting Log Viewer on port {port}...")
+
+        # IMPORTANT: Listen on all interfaces '0.0.0.0' so Titan can check connectivity
+        app.run(host='0.0.0.0', port=port)
