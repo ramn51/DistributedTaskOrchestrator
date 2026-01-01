@@ -146,10 +146,16 @@ public class SchedulerServer {
 
     private String handleRunScript(String fileName){
         try {
-            File file = new File(PERM_FILES_DIR + File.separator + fileName);
-            if (!file.exists()) {
-                return "ERROR: File not found in " + PERM_FILES_DIR;
+
+            System.out.println("[INFO] Looking for '" + fileName + "' in workspace...");
+            File file = findFileRecursive(fileName);
+
+            if (file == null || !file.exists()) {
+                System.err.println("[ERROR] File not found: " + fileName);
+                return "ERROR: File not found recursively in " + PERM_FILES_DIR;
             }
+
+            System.out.println("[INFO] Found: " + file.getAbsolutePath());
 
             Job job = new Job("TEMP", 1, 0);
             String fullJobId = "TSK-" + job.getId();
@@ -160,7 +166,7 @@ public class SchedulerServer {
 
             if (base64Content == null) return "ERROR: File not found";
 
-            String payload = "RUN_PAYLOAD|" + fileName + "|" + base64Content;
+            String payload = "RUN_PAYLOAD|" + file.getName() + "|" + base64Content;
             // Payload: RUN_PAYLOAD|filename|base64
 //            Job job = new Job(payload, 1, 0);
             job.setPayload(payload);
@@ -257,12 +263,43 @@ public class SchedulerServer {
                 // Payload is the jobId in this case
                 String jobId = payload;
                 List<String> logs = scheduler.getLogs(jobId);
+                if (logs.isEmpty()) {
+                    File logFile = new File("titan_workspace/shared/" + jobId + ".log");
+                    if (logFile.exists()) {
+                        try {
+                            return new String(Files.readAllBytes(logFile.toPath()));
+                        } catch (IOException e) {
+                            return "ERROR: Log file exists but unreadable";
+                        }
+                    }
+                }
                 return String.join("\n", logs);
 
 
             default:
                 return "UNKNOWN_OPCODE: " + packet.opCode;
 
+        }
+    }
+
+    private File findFileRecursive(String fileName) {
+        File root = new File(PERM_FILES_DIR);
+        if (!root.exists()) return null;
+
+        // 1. Try Direct Path
+        File direct = new File(root, fileName);
+        if (direct.exists()) return direct;
+
+        // 2. Recursive Search
+        try (java.util.stream.Stream<java.nio.file.Path> walk = Files.walk(root.toPath())) {
+            return walk.filter(p -> !Files.isDirectory(p))
+                    .filter(p -> p.getFileName().toString().equals(fileName))
+                    .findFirst()
+                    .map(java.nio.file.Path::toFile)
+                    .orElse(null);
+        } catch (IOException e) {
+            System.err.println("Error searching perm_files: " + e.getMessage());
+            return null;
         }
     }
 

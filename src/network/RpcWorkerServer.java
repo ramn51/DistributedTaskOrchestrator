@@ -280,9 +280,10 @@ public class RpcWorkerServer {
 
                 // RE-INJECT ID for the Handler
                 // We combine them so ScriptExecutorHandler gets "calc.py | JOB-123"
-                String payloadForHandler = taskData + "|" + jobId;
+//                String payloadForHandler = taskData + "|" + jobId;
 
-
+                // Result: "JOB-123|my_script.py|--verbose"
+                String payloadForHandler = jobId + "|" + taskData;
                 String result = handler.execute(payloadForHandler);
                 // This allows the worker to handle PDF_CONVERT or any other key
 //                String result = processCommand(taskData);

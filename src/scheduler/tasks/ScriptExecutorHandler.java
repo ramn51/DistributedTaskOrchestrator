@@ -5,6 +5,8 @@ import scheduler.TaskHandler;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class ScriptExecutorHandler implements TaskHandler {
@@ -32,28 +34,59 @@ public class ScriptExecutorHandler implements TaskHandler {
 
     @Override
     public String execute(String payload) {
-        // Payload comes from RpcWorkerServer as: "filename.py|JOB-123"
-        String[] parts = payload.split("\\|");
-        String filename = parts[0];
-        System.out.println("GIVEN PAYLOAD TO SCRIPT EXECUTOR " + payload);
+        // ROBUST PARSING (Standardized Format: JOB_ID | FILENAME | ARGS)
+        // We limit split to 3 so that arguments containing pipes are retained
+        String[] parts = payload.split("\\|", 3);
 
-//        String jobId = (parts.length > 1) ? parts[1] : "script_" + System.currentTimeMillis();
-        String jobId = filename;
+        String jobId = "UNKNOWN";
+        String filename = "";
+        String args = "";
 
-        // Handle RUN_PAYLOAD prefix if present
-        if (filename.equals("RUN_PAYLOAD")) {
-            if (parts.length > 1) filename = parts[1];
+//        String filename = parts[0];
+//        System.out.println("GIVEN PAYLOAD TO SCRIPT EXECUTOR " + payload);
+//
+//        String jobId = filename;
+        if (parts.length >= 2 && (parts[1].endsWith(".py") || parts[1].endsWith(".sh"))) {
+            // It is likely NEW format: JOB-123 | script.py | args
+            jobId = parts[0];
+            filename = parts[1];
+            if (parts.length > 2) args = parts[2];
         }
+        // This way I am just maintaining the previous crap parsing just for backward compatability where args are not passed
+        // OF: (Filename | ... | ID)
+        // Args remain null if old format is used
+        else {
+            filename = parts[0];
+            // Handle RUN_PAYLOAD prefix edge case
+            if (filename.equals("RUN_PAYLOAD") && parts.length > 1) {
+                filename = parts[1];
+            }
 
-        // NEW PARSER: The Job ID is now the LAST part of the payload
-        if (parts.length > 1) {
-            String lastPart = parts[parts.length - 1];
-            if (!lastPart.equals(filename) && !lastPart.equals("RUN_PAYLOAD")) {
-                jobId = lastPart;
+            // Extract Job ID from the LAST part
+            if (parts.length > 1) {
+                String lastPart = parts[parts.length - 1];
+                if (!lastPart.equals(filename) && !lastPart.equals("RUN_PAYLOAD")) {
+                    jobId = lastPart;
+                }
             }
         }
 
-        System.out.println("[INFO] [ScriptExecutor] Filename: " + filename + " | Context ID: " + jobId);
+        System.out.println("[INFO] Parsed -> Job: " + jobId + " | File: " + filename + " | Args: " + args);
+
+//        // Handle RUN_PAYLOAD prefix if present
+//        if (filename.equals("RUN_PAYLOAD")) {
+//            if (parts.length > 1) filename = parts[1];
+//        }
+//
+//        // NEW PARSER: The Job ID is now the LAST part of the payload
+//        if (parts.length > 1) {
+//            String lastPart = parts[parts.length - 1];
+//            if (!lastPart.equals(filename) && !lastPart.equals("RUN_PAYLOAD")) {
+//                jobId = lastPart;
+//            }
+//        }
+//
+//        System.out.println("[INFO] [ScriptExecutor] Filename: " + filename + " | Context ID: " + jobId);
 
         System.out.println("[INFO] [ScriptExecutor] Running: " + filename + " (ID: " + jobId + ")");
 //        File scriptFile = new File(WORKSPACE_DIR + File.separator + filename);
@@ -76,22 +109,47 @@ public class ScriptExecutorHandler implements TaskHandler {
                 if (!executionDir.exists()) executionDir.mkdirs();
             }
 
-            //Determine Interpreter
-            ProcessBuilder pb;
-            if (filename.endsWith(".py")) {
-                pb = new ProcessBuilder("python", "-u" ,scriptFile.getAbsolutePath());
-            } else if (filename.endsWith(".sh")) {
-                pb = new ProcessBuilder("/bin/bash", scriptFile.getAbsolutePath());
+            List<String> command = new ArrayList<>();
+
+            if(filename.endsWith(".py")){
+                command.add("python");
+                command.add("-u");
+                command.add(scriptFile.getAbsolutePath());
+            } else if(filename.endsWith(".sh")){
+                command.add("/bin/bash");
+                command.add(scriptFile.getAbsolutePath());
             } else {
-                // Assume executable binary
-                pb = new ProcessBuilder(scriptFile.getAbsolutePath());
+                command.add(scriptFile.getAbsolutePath()); // This is the case for Executable binary file
             }
+
+            if(!args.isEmpty()){
+                String [] argList = args.split(" ");
+                for(String arg: argList){
+                    if(!arg.trim().isEmpty()){
+                        command.add(arg.trim());
+                    }
+                }
+            }
+
+            ProcessBuilder pb = new ProcessBuilder(command);
+
+//            //Determine Interpreter
+//            ProcessBuilder pb;
+//            if (filename.endsWith(".py")) {
+//                pb = new ProcessBuilder("python", "-u" ,scriptFile.getAbsolutePath());
+//            } else if (filename.endsWith(".sh")) {
+//                pb = new ProcessBuilder("/bin/bash", scriptFile.getAbsolutePath());
+//            } else {
+//                // Assume executable binary
+//                pb = new ProcessBuilder(scriptFile.getAbsolutePath());
+//            }
 
             pb.directory(executionDir);
             // Combine Errors with Output
             pb.redirectErrorStream(true);
 
             System.out.println("[INFO] Context: " + executionDir.getName());
+            System.out.println("[INFO] Executing Command: " + command);
 
             // 3. Start Process
             Process process = pb.start();

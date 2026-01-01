@@ -12,10 +12,12 @@ OP_SUBMIT_DAG = 4
 OP_GET_LOGS = 16
 
 class TitanJob:
-    def __init__(self, job_id, filename, job_type="RUN_PAYLOAD", parents=None, port=0):
+    def __init__(self, job_id, filename, job_type="RUN_PAYLOAD", args=None,
+             parents=None, port=0):
         self.id = job_id
         self.filename = filename
         self.job_type = job_type
+        self.args = args if args else ""
         self.parents = parents if parents else []
         self.port = port
         self.priority = 2
@@ -23,37 +25,67 @@ class TitanJob:
         self.payload_b64 = self._load_file(filename)
 
     def _load_file(self, filename):
-        script_dir = os.path.dirname(os.path.abspath(__file__))
+        # --- NEW: ABSOLUTE PATH CHECK ---
+        # If filename is "C:\Users\...\args_tester.py", just use it directly!
+        if os.path.isabs(filename) and os.path.exists(filename):
+             print(f"[SDK] Using Absolute Path: {filename}")
+             with open(filename, 'rb') as f: 
+                 return base64.b64encode(f.read()).decode('utf-8')
+        # --------------------------------
+
+        # ... Existing logic (sdk_dir, search_dirs, etc.) ...
+        sdk_dir = os.path.dirname(os.path.abspath(__file__))
+        
         search_dirs = [
-            script_dir,
-            os.path.abspath(os.path.join(script_dir, "..")),
+            os.getcwd(), 
+            sdk_dir,
+            os.path.abspath(os.path.join(sdk_dir, "..")), 
             r"C:\Users\ASUS\IdeaProjects\DistributedOrchestrator\perm_files"
         ]
+
+        print(f"[SDK] Looking for '{filename}' in: {search_dirs}") # Debug Print
+
         for d in search_dirs:
             p = os.path.join(d, filename)
             if os.path.exists(p):
-                with open(p, 'rb') as f: return base64.b64encode(f.read()).decode('utf-8')
-        return "UEsDBA==" # Dummy
+                print(f"[SDK] ✅ Found at: {p}")
+                with open(p, 'rb') as f: 
+                    return base64.b64encode(f.read()).decode('utf-8')
+        
+        # Crash if not found
+        error_msg = f"❌ File '{filename}' not found in any search path."
+        raise FileNotFoundError(error_msg)
+        
 
     def to_string(self):
         parents_str = "[" + ",".join(self.parents) + "]"
+        
+        # FIX: Extract just the filename (e.g. "args_tester.py") from the full path
+        simple_filename = os.path.basename(self.filename)
+
         if self.job_type == "DEPLOY_PAYLOAD":
-            payload_content = f"{self.filename}|{self.payload_b64}|{self.port}"
+            payload_content = f"{simple_filename}|{self.payload_b64}|{self.port}"
         else:
-            payload_content = f"{self.filename}|{self.payload_b64}"
+            # RUN_PAYLOAD Format: filename | args | base64
+            safe_args = self.args.replace("|", " ")
+            # Use simple_filename here instead of self.filename
+            payload_content = f"{simple_filename}|{safe_args}|{self.payload_b64}"
+            
         return f"{self.id}|GENERAL|{self.job_type}|{payload_content}|{self.priority}|{self.delay}|{parents_str}"
 
 class TitanClient:
     def submit_dag(self, name, jobs):
         """Submits a list of TitanJobs as a DAG"""
-        print(f"🚀 [TitanSDK] Submitting DAG: {name}")
+        print(f"[TitanSDK] Submitting DAG: {name}")
         dag_payload = " ; ".join([j.to_string() for j in jobs])
         return self._send_request(OP_SUBMIT_DAG, dag_payload)
 
+    
+    def submit_job(self, job):
+        """Helper to submit a single job as a DAG of 1"""
+        return self.submit_dag(job.id, [job])
+    
     def fetch_logs(self, job_id):
-        """Asks Titan Master for the logs of a specific Job"""
-        # NOTE: You need to ensure OP_GET_LOGS (18) is implemented in SchedulerServer.java
-        # If not, use OP_STATS or implement a new OpCode.
         return self._send_request(OP_GET_LOGS, job_id)
 
     def _send_request(self, op_code, payload):
