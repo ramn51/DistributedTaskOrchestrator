@@ -19,7 +19,7 @@ Titan provides a streamlined environment for diverse workloads:
 
 <p align="center">
 
-  <img src="screenshots/UI_Screenshot.png" alt="Main Dashboard View" width="45%" style="margin-right: 10px;"/>
+  <img src="screenshots/UI_Screenshot.png" alt="main.java.titan.Main Dashboard View" width="45%" style="margin-right: 10px;"/>
 
 </p>
 
@@ -40,8 +40,8 @@ Titan provides a streamlined environment for diverse workloads:
     -  **Ops Tasks**: Email alerts, PDF conversions, DB cleanup signals.
 - **Custom TCP Protocol**: Implements a custom wire protocol (`TITAN_PROTOCOL`) using fixed-header framing (Version + OpCode + Length). Designed to handle TCP fragmentation and avoid the overhead of text-based protocols like JSON.
 - **Real-time Dashboard**: A lightweight Flask (Python) UI to visualize node health, active job queues, and real-time logs.
-- **Optimistic Scheduling & Fail-Fast**: The scheduler utilizes "Optimistic Accounting" to pre-reserve execution slots, preventing race conditions during burst submissions. It detects infrastructure conflicts (e.g., blocked ports) instantly, rejecting bad deployments without wasting retry cycles.
-- **Task Affinity**: Implements "Parent-Child Affinity," where sub-tasks spawned by a worker are preferentially scheduled on the same node (or a specific target) to minimize network latency and leverage local caching. Mainly useful for ML and other workloads that need specific environment and dependent tasks.
+- **Optimistic Scheduling & Fail-Fast**: The main.java.titan.scheduler utilizes "Optimistic Accounting" to pre-reserve execution slots, preventing race conditions during burst submissions. It detects infrastructure conflicts (e.g., blocked ports) instantly, rejecting bad deployments without wasting retry cycles.
+- **Task Affinity**: Implements "Parent-Child Affinity," where sub-tasks spawned by a worker are preferentially scheduled on the same node (or a specific target) to minimize main.java.titan.network latency and leverage local caching. Mainly useful for ML and other workloads that need specific environment and dependent tasks.
 
 
 ## 🛠️ Architecture
@@ -98,9 +98,9 @@ javac -d bin src/**/*.java
 ## Quick Start (Local)
 ### Running the Cluster
 
-1. **Start Master:** `java -cp bin network.SchedulerServer`
-2. **Start Worker:** `java -cp bin network.RpcWorkerServer 8080`
-3. **Start CLI:** `java -cp bin client.TitanCLI`
+1. **Start Master:** `java -cp bin main.java.titan.network.SchedulerServer`
+2. **Start Worker:** `java -cp bin titan.network.RpcWorkerServer 8080`
+3. **Start CLI:** `java -cp bin client.main.java.titan.TitanCLI`
 
 
 ### Easy way alternative
@@ -110,7 +110,7 @@ If you prefer running without Docker, open **three separate terminals**:
 
 1. **Terminal 1 (Scheduler):**
 ```bash
-java scheduler.TitanMaster
+java main.java.titan.scheduler.main.java.titan.TitanMaster
 # Output: [OK] SchedulerServer Listening on port 9090
 
 ```
@@ -118,7 +118,7 @@ java scheduler.TitanMaster
 
 2. **Terminal 2 (Worker):**
 ```bash
-java network.TitanWorker
+java main.java.titan.network.main.java.titan.TitanWorker
 # Output: [OK] Successfully registered with Scheduler!
 
 ```
@@ -142,13 +142,13 @@ The easiest way to run a full cluster (1 Scheduler + 3 Workers) is using Docker 
 version: "3.8"
 
 services:
-  titan-scheduler:
+  titan-main.java.titan.scheduler:
     build: .
     command:
       - java
       - -cp
       - out/production/DistributedOrchestrator
-      - scheduler.TitanMaster
+      - main.java.titan.scheduler.main.java.titan.TitanMaster
     ports:
       - "9090:9090"
 
@@ -158,9 +158,9 @@ services:
       - java
       - -cp
       - out/production/DistributedOrchestrator
-      - network.TitanWorker
+      - main.java.titan.network.main.java.titan.TitanWorker
     depends_on:
-      - titan-scheduler
+      - titan-main.java.titan.scheduler
 ```
 
 **2. Run the Cluster**

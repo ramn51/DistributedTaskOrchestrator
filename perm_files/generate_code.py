@@ -19,7 +19,7 @@ def main():
         f.write("# UI Module\ndef draw(): print('Drawing...')")
     print("[OK] Created ui.py")     # <--- Changed from ✅
 
-    # Create Main (The output of Merge)
+    # Create main.java.titan.Main (The output of Merge)
     with open("main.py", "w") as f:
         f.write("import logic\nimport ui\nprint('Merged App')")
     print("[OK] Created main.py")   # <--- Changed from ✅

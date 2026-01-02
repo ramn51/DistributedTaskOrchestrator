@@ -2,7 +2,7 @@ import socket
 import struct
 import base64
 import os
-import time
+import zipfile
 
 # --- CONFIGURATION ---
 TITAN_HOST = "127.0.0.1"
@@ -10,6 +10,7 @@ TITAN_PORT = 9090
 VERSION = 1
 OP_SUBMIT_DAG = 4
 OP_GET_LOGS = 16
+OP_UPLOAD_ASSET = 0x53
 
 class TitanJob:
     def __init__(self, job_id, filename, job_type="RUN_PAYLOAD", args=None,
@@ -22,56 +23,74 @@ class TitanJob:
         self.port = port
         self.priority = 2
         self.delay = 0
+        
+        # STRICT PATHING: Load immediately using exact path provided
         self.payload_b64 = self._load_file(filename)
 
     def _load_file(self, filename):
-        # --- NEW: ABSOLUTE PATH CHECK ---
-        # If filename is "C:\Users\...\args_tester.py", just use it directly!
-        if os.path.isabs(filename) and os.path.exists(filename):
-             print(f"[SDK] Using Absolute Path: {filename}")
-             with open(filename, 'rb') as f: 
-                 return base64.b64encode(f.read()).decode('utf-8')
-        # --------------------------------
-
-        # ... Existing logic (sdk_dir, search_dirs, etc.) ...
-        sdk_dir = os.path.dirname(os.path.abspath(__file__))
+        # 1. Resolve Path (Absolute or Relative to CWD)
+        if os.path.exists(filename):
+            real_path = os.path.abspath(filename)
+            # print(f"[SDK] Loading Job File: {real_path}") 
+            with open(real_path, 'rb') as f: 
+                return base64.b64encode(f.read()).decode('utf-8')
         
-        search_dirs = [
-            os.getcwd(), 
-            sdk_dir,
-            os.path.abspath(os.path.join(sdk_dir, "..")), 
-            r"C:\Users\ASUS\IdeaProjects\DistributedOrchestrator\perm_files"
-        ]
+        # 2. Fail loudly if not found (No magic guessing)
+        raise FileNotFoundError(f"❌ File '{filename}' not found. Please provide the correct absolute path.")
 
-        print(f"[SDK] Looking for '{filename}' in: {search_dirs}") # Debug Print
+    # def to_string(self):
+    #     parents_str = "[" + ",".join(self.parents) + "]"
+        
+    #     # We send only the filename (not full path) to the Master/Worker
+    #     simple_filename = os.path.basename(self.filename)
 
-        for d in search_dirs:
-            p = os.path.join(d, filename)
-            if os.path.exists(p):
-                print(f"[SDK] ✅ Found at: {p}")
-                with open(p, 'rb') as f: 
-                    return base64.b64encode(f.read()).decode('utf-8')
-        
-        # Crash if not found
-        error_msg = f"❌ File '{filename}' not found in any search path."
-        raise FileNotFoundError(error_msg)
-        
+    #     if self.job_type == "DEPLOY_PAYLOAD":
+    #         payload_content = f"{simple_filename}|{self.payload_b64}|{self.port}"
+    #     else:
+    #         safe_args = self.args.replace("|", " ")
+    #         payload_content = f"{simple_filename}|{safe_args}|{self.payload_b64}"
+            
+    #     return f"{self.id}|GENERAL|{self.job_type}|{payload_content}|{self.priority}|{self.delay}|{parents_str}"
 
     def to_string(self):
         parents_str = "[" + ",".join(self.parents) + "]"
-        
-        # FIX: Extract just the filename (e.g. "args_tester.py") from the full path
         simple_filename = os.path.basename(self.filename)
+        safe_args = self.args.replace("|", " ")
 
-        if self.job_type == "DEPLOY_PAYLOAD":
-            payload_content = f"{simple_filename}|{self.payload_b64}|{self.port}"
-        else:
-            # RUN_PAYLOAD Format: filename | args | base64
-            safe_args = self.args.replace("|", " ")
-            # Use simple_filename here instead of self.filename
-            payload_content = f"{simple_filename}|{safe_args}|{self.payload_b64}"
+        #  SERVICE / DEPLOYMENT ---
+        # Handles: Worker.jar, Web Servers, Long-running Agents
+        if self.job_type == "DEPLOY_PAYLOAD" or self.job_type == "service":
             
-        return f"{self.id}|GENERAL|{self.job_type}|{payload_content}|{self.priority}|{self.delay}|{parents_str}"
+            if self.is_remote:
+                # [ARCHIVE SERVICE] - Project Zip based
+                # We replace the Base64 slot with 'args' since we don't send code.
+                # Format: zip_name/entry.py | args | port
+                header = "START_ARCHIVE_SERVICE"
+                payload_content = f"{self.filename}|{safe_args}|{self.port}"
+            
+            else:
+                # [INLINE SERVICE] - Single File (e.g. Worker.jar or server_dashboard.py)
+                # This preserves your existing logic for Worker Deployment
+                # Format: filename | base64 | port
+                header = "DEPLOY_PAYLOAD"
+                payload_content = f"{simple_filename}|{self.payload_b64}|{self.port}"
+
+        #  TASK / SCRIPT ---
+        # Handles: Ephemeral Python scripts, One-off calculations
+        else:
+            if self.is_remote:
+                # [ARCHIVE TASK]
+                # Format: zip_name/entry.py | args
+                header = "RUN_ARCHIVE"
+                payload_content = f"{self.filename}|{safe_args}"
+            
+            else:
+                # [INLINE TASK]
+                # Format: filename | args | base64
+                header = "RUN_PAYLOAD"
+                payload_content = f"{simple_filename}|{safe_args}|{self.payload_b64}"
+
+        return f"{self.id}|GENERAL|{header}|{payload_content}|{self.priority}|{self.delay}|{parents_str}"
 
 class TitanClient:
     def submit_dag(self, name, jobs):
@@ -79,27 +98,128 @@ class TitanClient:
         print(f"[TitanSDK] Submitting DAG: {name}")
         dag_payload = " ; ".join([j.to_string() for j in jobs])
         return self._send_request(OP_SUBMIT_DAG, dag_payload)
-
     
     def submit_job(self, job):
-        """Helper to submit a single job as a DAG of 1"""
         return self.submit_dag(job.id, [job])
     
     def fetch_logs(self, job_id):
         return self._send_request(OP_GET_LOGS, job_id)
 
+    def upload_file(self, filepath):
+        """Uploads a single file to Master's perm_files"""
+        # STRICT PATHING
+        if not os.path.exists(filepath):
+            return f"ERROR: File not found at: {filepath}"
+
+        real_path = os.path.abspath(filepath)
+        clean_filename = os.path.basename(real_path)
+        print(f"[SDK] Uploading {clean_filename} from {real_path}...")
+
+        with open(real_path, 'rb') as f:
+            b64_content = base64.b64encode(f.read()).decode('utf-8')
+        
+        payload = f"{clean_filename}|{b64_content}"
+        return self._send_request(OP_UPLOAD_ASSET, payload)
+
+    def upload_project_folder(self, folder_path, project_name=None):
+        """Zips a folder and uploads it as project_name.zip"""
+        # STRICT PATHING
+        if not os.path.exists(folder_path):
+             return f"ERROR: Folder not found at: {folder_path}"
+
+        real_folder_path = os.path.abspath(folder_path)
+        
+        if not project_name:
+            project_name = os.path.basename(real_folder_path)
+        
+        zip_filename = f"{project_name}.zip"
+        print(f"[SDK] Zipping folder '{real_folder_path}' to '{zip_filename}'...")
+
+        # Create Zip in the CURRENT WORKING DIRECTORY (Temporary)
+        try:
+            with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, dirs, files in os.walk(real_folder_path):
+                    for file in files:
+                        if file == zip_filename: continue 
+                        if "__pycache__" in root: continue
+                        
+                        file_path = os.path.join(root, file)
+                        # Store relative path inside zip so unzipping is clean
+                        arcname = os.path.relpath(file_path, real_folder_path)
+                        zipf.write(file_path, arcname)
+            
+            # Upload the newly created zip
+            print(f"[SDK] Uploading zipped project '{zip_filename}'...")
+            # Re-use our strict upload_file method
+            response = self.upload_file(zip_filename)
+            
+            return response
+            
+        finally:
+            # Cleanup local zip file
+            if os.path.exists(zip_filename):
+                try: os.remove(zip_filename) 
+                except: pass
+
     def _send_request(self, op_code, payload):
+        s = None
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.connect((TITAN_HOST, TITAN_PORT))
+            
             payload_bytes = payload.encode('utf-8')
             header = struct.pack('>BBBBI', VERSION, op_code, 0, 0, len(payload_bytes))
             s.sendall(header + payload_bytes)
 
-            s.settimeout(5)
-            # Basic Read Loop for response
-            response = s.recv(4096).decode('utf-8', errors='ignore')
-            s.close()
-            return response
+            s.settimeout(10)
+            
+            # 1. Read First 8 Bytes
+            initial_data = self._recv_exact(s, 8)
+            if not initial_data: return "ERROR: No Response"
+
+            is_valid_protocol = False
+            resp_len = 0
+
+            # 2. Smart Parse
+            try:
+                ver, op, flags, reserved, length = struct.unpack('>BBBBI', initial_data)
+                if ver == 1: 
+                    is_valid_protocol = True
+                    resp_len = length
+            except:
+                is_valid_protocol = False
+
+            if is_valid_protocol:
+                if resp_len > 0:
+                    response_bytes = self._recv_exact(s, resp_len)
+                    return response_bytes.decode('utf-8')
+                return ""
+            else:
+                # Fallback
+                remaining_data = b""
+                try:
+                    while True:
+                        chunk = s.recv(4096)
+                        if not chunk: break
+                        remaining_data += chunk
+                except socket.timeout:
+                    pass
+                
+                full_response = initial_data + remaining_data
+                return full_response.decode('utf-8', errors='ignore')
+
         except Exception as e:
-            return f"ERROR: {e}"
+            return f"CONNECTION_ERROR: {e}"
+        finally:
+            if s: s.close()
+
+    def _recv_exact(self, sock, n):
+        data = b''
+        while len(data) < n:
+            try:
+                packet = sock.recv(n - len(data))
+                if not packet: return None
+                data += packet
+            except:
+                return data if len(data) > 0 else None
+        return data
