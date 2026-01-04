@@ -7,6 +7,7 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import titan.network.LogBatcher;
 
 public class ScriptExecutorHandler implements TaskHandler {
     private static final String WORKSPACE_DIR = "titan_workspace";
@@ -71,35 +72,35 @@ public class ScriptExecutorHandler implements TaskHandler {
         }
 
         System.out.println("[INFO] Parsed -> Job: " + jobId + " | File: " + filename + " | Args: " + args);
-
-//        // Handle RUN_PAYLOAD prefix if present
-//        if (filename.equals("RUN_PAYLOAD")) {
-//            if (parts.length > 1) filename = parts[1];
-//        }
-//
-//        // NEW PARSER: The Job ID is now the LAST part of the payload
-//        if (parts.length > 1) {
-//            String lastPart = parts[parts.length - 1];
-//            if (!lastPart.equals(filename) && !lastPart.equals("RUN_PAYLOAD")) {
-//                jobId = lastPart;
-//            }
-//        }
-//
-//        System.out.println("[INFO] [ScriptExecutor] Filename: " + filename + " | Context ID: " + jobId);
-
         System.out.println("[INFO] [ScriptExecutor] Running: " + filename + " (ID: " + jobId + ")");
 //        File scriptFile = new File(WORKSPACE_DIR + File.separator + filename);
-        File scriptFile = new File(rootWorkspace, filename);
+//        File scriptFile = new File(rootWorkspace, filename);
+        File scriptFile = new File(filename);
+
+        if (!scriptFile.isAbsolute()) {
+            // If it's relative (Normal execution), prepend the workspace root
+            scriptFile = new File(rootWorkspace, filename);
+        }
 
         if (!scriptFile.exists()) {
             return "ERROR: Script file not found: " + filename;
         }
 
+        LogBatcher batcher = new LogBatcher(
+                jobId,
+                parentServer.getSchedulerHost(),
+                parentServer.getSchedulerPort()
+        );
+
         try {
 
             File executionDir;
             // 3. Selection Logic (No redundant mkdirs for Shared)
-            if (jobId.startsWith("DAG-")) {
+            if (scriptFile.isAbsolute()) {
+                // ARCHIVE MODE: Run inside the unzipped folder (like in titan_workspace/JOB-123/)
+                executionDir = scriptFile.getParentFile();
+            }
+            else if (jobId.startsWith("DAG-")) {
                 // Use the pre-calculated shared folder
                 executionDir = this.sharedWorkspace;
             } else {
@@ -132,17 +133,6 @@ public class ScriptExecutorHandler implements TaskHandler {
 
             ProcessBuilder pb = new ProcessBuilder(command);
 
-//            //Determine Interpreter
-//            ProcessBuilder pb;
-//            if (filename.endsWith(".py")) {
-//                pb = new ProcessBuilder("python", "-u" ,scriptFile.getAbsolutePath());
-//            } else if (filename.endsWith(".sh")) {
-//                pb = new ProcessBuilder("/bin/bash", scriptFile.getAbsolutePath());
-//            } else {
-//                // Assume executable binary
-//                pb = new ProcessBuilder(scriptFile.getAbsolutePath());
-//            }
-
             pb.directory(executionDir);
             // Combine Errors with Output
             pb.redirectErrorStream(true);
@@ -154,19 +144,16 @@ public class ScriptExecutorHandler implements TaskHandler {
             Process process = pb.start();
 
             final String finalJobId = jobId;
-
             StringBuilder finalOutput = new StringBuilder();
-
             Thread streamer = new Thread(() -> {
                 File logFile = new File(executionDir, finalJobId + ".log");
                 System.out.println("[DEBUG] Writing logs to: " + logFile.getAbsolutePath());
                 try(BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
                    BufferedWriter fileWriter = new BufferedWriter(new FileWriter(logFile, true))){
-
                        String line;
-
                        while ((line = bufferedReader.readLine()) != null) {
-                           parentServer.streamLogToMaster(finalJobId, line);
+//                           parentServer.streamLogToMaster(finalJobId, line);
+                           batcher.addLog(line);
 
                            fileWriter.write(line);
                            fileWriter.newLine();
@@ -202,6 +189,8 @@ public class ScriptExecutorHandler implements TaskHandler {
         } catch (Exception e) {
             e.printStackTrace();
             return "ERROR: Execution failed - " + e.getMessage();
+        } finally {
+            batcher.close();
         }
     }
 }

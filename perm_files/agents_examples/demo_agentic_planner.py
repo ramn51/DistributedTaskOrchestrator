@@ -5,10 +5,10 @@ from openai import OpenAI
 from titan_sdk import TitanClient, TitanJob
 
 # --- CONFIGURATION ---
-API_KEY = "YOUR_OPENAI_API_KEY"  # <--- PUT KEY HERE
+API_KEY = "YOUR_OPENAI_API_KEY"
 client = OpenAI(api_key=API_KEY)
 
-# --- THE SYSTEM PROMPT (The "Brain" Instructions) ---
+# --- THE SYSTEM PROMPT---
 SYSTEM_PROMPT = """
 You are the Orchestrator for the "Titan Distributed Supercomputer".
 Your goal is to execute the USER'S REQUEST by scheduling jobs on the cluster.

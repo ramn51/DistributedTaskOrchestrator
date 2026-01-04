@@ -28,7 +28,9 @@ public class TitanProtocol {
     public static final byte OP_GET_LOGS          = 0x16;
     public static final byte OP_UPLOAD_ASSET      = 0x53;
     public static final byte OP_FETCH_ASSET       = 0x54;
-
+    public static final byte OP_LOG_BATCH        = 0x17;
+    public static final byte OP_RUN_ARCHIVE        =0x18;
+    public static final byte OP_START_SERVICE_ARCHIVE = 0x19;
     // Job Type Headers (Strings used inside payload)
     public static final String RUN_ARCHIVE = "RUN_ARCHIVE";
     public static final String START_ARCHIVE_SERVICE = "START_ARCHIVE_SERVICE";

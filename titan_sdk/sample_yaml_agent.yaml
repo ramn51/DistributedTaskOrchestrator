@@ -1,0 +1,36 @@
+name: "advanced-financial-agent"
+version: "2.0"
+
+jobs:
+  # CASE 1: High Priority Initialization
+  - id: "db-init"
+    type: "run"
+    file: "scripts/init_db.py"
+    priority: 10              # 10 = Highest (System Critical)
+    
+  # CASE 2: Delayed Execution
+  - id: "market-watch"
+    type: "run"
+    file: "src/watcher.py"
+    delay: 5                  # Wait 5 seconds before queueing
+    depends_on:
+      - "db-init"
+
+  # CASE 3: Affinity (Data Locality)
+  # This job must run on the SAME worker as "market-watch"
+  # (Useful if "market-watch" downloaded a huge file locally)
+  - id: "data-processor"
+    type: "run"
+    file: "src/process.py"
+    affinity: true            # STICKY: Follow the parent's worker
+    depends_on:
+      - "market-watch"
+
+  # CASE 4: Service with Port Mapping
+  - id: "api-gateway"
+    type: "service"
+    file: "src/gateway.py"
+    port: 8095
+    priority: 5
+    depends_on: 
+      - "data-processor"

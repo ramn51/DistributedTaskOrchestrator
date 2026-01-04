@@ -9,23 +9,28 @@ TITAN_HOST = "127.0.0.1"
 TITAN_PORT = 9090
 VERSION = 1
 OP_SUBMIT_DAG = 4
-OP_GET_LOGS = 16
+OP_LOG_BATCH = 0x17
 OP_UPLOAD_ASSET = 0x53
 
 class TitanJob:
     def __init__(self, job_id, filename, job_type="RUN_PAYLOAD", args=None,
-             parents=None, port=0):
+             parents=None, port=0, is_archive=False, priority=1, delay=0, affinity=False):
         self.id = job_id
         self.filename = filename
         self.job_type = job_type
         self.args = args if args else ""
         self.parents = parents if parents else []
         self.port = port
-        self.priority = 2
-        self.delay = 0
+        self.is_archive = is_archive
+        self.priority = priority   # Default 1
+        self.delay = delay         # Default 0 (ms or sec depends on Scheduler logic)
+        self.affinity = affinity
         
-        # STRICT PATHING: Load immediately using exact path provided
-        self.payload_b64 = self._load_file(filename)
+
+        if not self.is_archive:
+            self.payload_b64 = self._load_file(filename)
+        else:
+            self.payload_b64 = "REMOTE_ASSET"
 
     def _load_file(self, filename):
         # 1. Resolve Path (Absolute or Relative to CWD)
@@ -57,11 +62,13 @@ class TitanJob:
         simple_filename = os.path.basename(self.filename)
         safe_args = self.args.replace("|", " ")
 
+        affinity_suffix = "|AFFINITY" if self.affinity else ""
+
         #  SERVICE / DEPLOYMENT ---
         # Handles: Worker.jar, Web Servers, Long-running Agents
-        if self.job_type == "DEPLOY_PAYLOAD" or self.job_type == "service":
+        if self.is_archive:
             
-            if self.is_remote:
+            if self.job_type == "SERVICE" or self.job_type == "DEPLOY_PAYLOAD":
                 # [ARCHIVE SERVICE] - Project Zip based
                 # We replace the Base64 slot with 'args' since we don't send code.
                 # Format: zip_name/entry.py | args | port
@@ -69,28 +76,25 @@ class TitanJob:
                 payload_content = f"{self.filename}|{safe_args}|{self.port}"
             
             else:
-                # [INLINE SERVICE] - Single File (e.g. Worker.jar or server_dashboard.py)
-                # This preserves your existing logic for Worker Deployment
-                # Format: filename | base64 | port
-                header = "DEPLOY_PAYLOAD"
-                payload_content = f"{simple_filename}|{self.payload_b64}|{self.port}"
 
+                header = "RUN_ARCHIVE"
+                # Format: RUN_ARCHIVE | zip.zip/entry.py | args
+                payload_content = f"{self.filename}|{safe_args}"
         #  TASK / SCRIPT ---
         # Handles: Ephemeral Python scripts, One-off calculations
+        # [INLINE SERVICE] - Single File (e.g. Worker.jar or server_dashboard.py)
+        # This preserves your existing logic for Worker Deployment
+        # Format: filename | base64 | port
         else:
-            if self.is_remote:
-                # [ARCHIVE TASK]
-                # Format: zip_name/entry.py | args
-                header = "RUN_ARCHIVE"
-                payload_content = f"{self.filename}|{safe_args}"
-            
+            simple_filename = os.path.basename(self.filename)
+            if self.job_type == "SERVICE" or self.job_type == "DEPLOY_PAYLOAD":
+                header = "DEPLOY_PAYLOAD"
+                payload_content = f"{simple_filename}|{self.payload_b64}|{self.port}"
             else:
-                # [INLINE TASK]
-                # Format: filename | args | base64
                 header = "RUN_PAYLOAD"
                 payload_content = f"{simple_filename}|{safe_args}|{self.payload_b64}"
 
-        return f"{self.id}|GENERAL|{header}|{payload_content}|{self.priority}|{self.delay}|{parents_str}"
+        return f"{self.id}|GENERAL|{header}|{payload_content}|{self.priority}|{self.delay}|{parents_str}{affinity_suffix}"
 
 class TitanClient:
     def submit_dag(self, name, jobs):
@@ -103,7 +107,7 @@ class TitanClient:
         return self.submit_dag(job.id, [job])
     
     def fetch_logs(self, job_id):
-        return self._send_request(OP_GET_LOGS, job_id)
+        return self._send_request(OP_LOG_BATCH, job_id)
 
     def upload_file(self, filepath):
         """Uploads a single file to Master's perm_files"""

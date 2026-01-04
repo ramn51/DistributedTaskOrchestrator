@@ -1,5 +1,6 @@
 package titan.tasks;
 
+import titan.network.LogBatcher;
 import titan.network.RpcWorkerServer;
 import titan.tasks.TaskHandler;
 
@@ -37,7 +38,14 @@ public class ServiceHandler implements TaskHandler {
 
     private String startProcess(String fileName, String serviceId, String port){
         // Payload: "filename|service_id"
-        File scriptFile = new File(WORKSPACE_DIR, fileName);
+//        File scriptFile = new File(WORKSPACE_DIR, fileName);
+
+        File scriptFile = new File(fileName);
+        // If it's NOT absolute (standard deploy), append workspace dir.
+        // If it IS absolute (archive deploy), leave it alone.
+        if (!scriptFile.isAbsolute()) {
+            scriptFile = new File(WORKSPACE_DIR, fileName);
+        }
 
         if(!scriptFile.exists()){
             return "ERROR: File not found at " + scriptFile.getAbsolutePath();
@@ -68,8 +76,14 @@ public class ServiceHandler implements TaskHandler {
 
                 pb.directory(new File(WORKSPACE_DIR));
 
-                pb.start();
+                Process p = pb.start();
 
+                ProcessRegistry.register(serviceId, p.pid());
+
+//                p.onExit().thenRun(() -> {
+//                    titan.tasks.ProcessRegistry.unregister(serviceId);
+//                    System.out.println("[INFO] Worker JAR Stopped: " + serviceId);
+//                });
 
                 System.out.println("[DEBUG] Launched Detached JAR: " + jarPath + " on port " + port);
                 return "DEPLOYED_SUCCESS | ID: " + serviceId + " | PID: DETACHED";
@@ -78,15 +92,15 @@ public class ServiceHandler implements TaskHandler {
             }
         } else{
             if (fileName.endsWith(".py")) {
-                return launchDetachedProcess(serviceId, "python", scriptFile.getAbsolutePath());
+                return launchDetachedProcess(serviceId, scriptFile.getParentFile(), "python", scriptFile.getAbsolutePath());
             } else {
-                return launchDetachedProcess(serviceId, scriptFile.getAbsolutePath());
+                return launchDetachedProcess(serviceId, scriptFile.getParentFile(), scriptFile.getAbsolutePath());
             }
         }
 
     }
 
-    private String launchDetachedProcess(String serviceId, String... command) {
+    private String launchDetachedProcess(String serviceId, File executionDir, String... command) {
         if (runningServices.containsKey(serviceId)) {
             return "SERVICE_ALREADY_RUNNING: " + serviceId;
         }
@@ -100,10 +114,22 @@ public class ServiceHandler implements TaskHandler {
 //            pb.redirectError(logFile);
             pb.redirectErrorStream(true);
 
+            if (executionDir != null && executionDir.exists()) {
+                pb.directory(executionDir);
+            } else {
+                pb.directory(new File(WORKSPACE_DIR));
+            }
+
             // 3. START (Async/Detached)
             Process process = pb.start();
 
             new Thread(() -> {
+                LogBatcher batcher = new LogBatcher(
+                        serviceId,
+                        parentServer.getSchedulerHost(),
+                        parentServer.getSchedulerPort()
+                );
+
                 File logFile = new File(WORKSPACE_DIR, serviceId + ".log");
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
                      FileWriter fw = new FileWriter(logFile, true)) { // 'true' for append mode
@@ -114,20 +140,28 @@ public class ServiceHandler implements TaskHandler {
                         fw.write(line + System.lineSeparator());
                         fw.flush();
 
+                        batcher.addLog(line);
+
                         // Stream to Master (Real-time)
-                        parentServer.streamLogToMaster(serviceId, line);
+//                        parentServer.streamLogToMaster(serviceId, line);
                     }
                 } catch (IOException e) {
                     System.out.println("[STREAM END] " + serviceId + " finished.");
+                }finally {
+                    batcher.close();
                 }
             }).start();
 
             // 4. Register in Memory Map
             runningServices.put(serviceId, process);
 
+            long pid = process.pid();
+            titan.tasks.ProcessRegistry.register(serviceId, pid);
+
             // 5. Clean up Map when process dies
             process.onExit().thenRun(() -> {
                 runningServices.remove(serviceId);
+                titan.tasks.ProcessRegistry.unregister(serviceId);
                 System.out.println("[INFO] Service Stopped: " + serviceId);
                 parentServer.notifyMasterOfServiceStop(serviceId);
             });

@@ -247,6 +247,24 @@ public class SchedulerServer {
                 scheduler.handleJobCallback(payload);
                 return "ACK_CALLBACK";
 
+            case TitanProtocol.OP_LOG_BATCH:
+                // Payload format: "jobId|line1\nline2\nline3..."
+                // Split Job ID from the massive text block
+                String[] batchParts = payload.split("\\|", 2);
+
+                if (batchParts.length == 2) {
+                    String batchJobId = batchParts[0];
+                    String fullLogBlock = batchParts[1];
+
+                    // Split the block back into individual lines
+                    // The Worker joined them with "\n", so we split by "\n"
+                    String[] batchLines = fullLogBlock.split("\n");
+                    for (String line : batchLines) {
+                        scheduler.logStream(batchJobId, line);
+                    }
+                }
+                return "ACK_BATCH";
+
             case TitanProtocol.OP_LOG_STREAM:
                 // Payload format: "jobId|logLine"
                 // Split into 2 parts max so the log message can contain pipes safely
@@ -271,6 +289,8 @@ public class SchedulerServer {
                     }
                 }
                 return String.join("\n", logs);
+
+
 
 
             case TitanProtocol.OP_UPLOAD_ASSET:

@@ -1,5 +1,6 @@
 package titan.network;
 
+import titan.filesys.WorkspaceManager;
 import titan.tasks.TaskHandler;
 import titan.tasks.FileHandler;
 import titan.tasks.PdfConversionHandler;
@@ -42,6 +43,9 @@ public class RpcWorkerServer {
         addTaskHandler();
     }
 
+    public String getSchedulerHost() { return schedulerHost; }
+    public int getSchedulerPort() { return schedulerPort; }
+
     public void addTaskHandler(){
         taskHanlderMap.put("PDF_CONVERT", new PdfConversionHandler());
         taskHanlderMap.put("STAGE_FILE", new FileHandler());
@@ -64,6 +68,8 @@ public class RpcWorkerServer {
 
     public void start() throws Exception {
         System.out.println("DEBUG: Attempting to bind to port: " + this.port);
+        System.out.println("---- Worker Startup Check ----");
+        titan.tasks.ProcessRegistry.loadAndCleanUpProcesses();
 
         try(ServerSocket serverSocket = new ServerSocket(port)){
             System.out.println("Worker Server started on port " + port);
@@ -120,6 +126,12 @@ public class RpcWorkerServer {
                         String stats = "PONG|" + activeThreads + "|" + maxThreads;
                         TitanProtocol.send(out, TitanProtocol.OP_ACK, stats);
 
+                    } else if(packet.opCode == TitanProtocol.OP_RUN_ARCHIVE){
+                        handleArchiveJob(out, packet.payload);
+
+                    } else if(packet.opCode == TitanProtocol.OP_START_SERVICE_ARCHIVE){
+                        handleArchiveService(out, packet.payload);
+
                     } else if (packet.opCode == TitanProtocol.OP_STAGE) {
                         // handleExecution(out, packet.payload, "STAGE_FILE");
                         handleSyncExecution(out, packet.payload, "STAGE_FILE");
@@ -137,8 +149,6 @@ public class RpcWorkerServer {
                             Thread.sleep(100); // add busy waiting for the OS to handle the exit
                             System.exit(0);
                         }
-
-//                        handleExecution(out, packet.payload, "RUN_SCRIPT");
                         handleAsyncExecution(out, packet.payload);
                     }
                 } catch (EOFException e) {
@@ -191,6 +201,44 @@ public class RpcWorkerServer {
             }catch (Exception e){
                 e.printStackTrace();
             }
+        }
+    }
+
+    private void handleArchiveJob(DataOutputStream out, String payload){
+        // Payload: JOB_ID | ENTRY_FILE | BASE64_ZIP
+        try{
+            String[] parts = payload.split("\\|");
+            String jobId = parts[0];
+            String entryFile = parts[1];
+            String base64Zip = parts[2];
+
+            WorkspaceManager.stageArchive(jobId, base64Zip);
+            String absPath = WorkspaceManager.resolvePath(jobId, entryFile);
+
+            handleAsyncExecution(out, jobId + "|" + absPath);
+        } catch(Exception e){
+            e.printStackTrace();
+            try { TitanProtocol.send(out, TitanProtocol.OP_ERROR, "ARCHIVE_FAILED: " + e.getMessage()); } catch (IOException ignored) {}
+        }
+    }
+
+    private void handleArchiveService(DataOutputStream out, String payload){
+        try{
+            // Payload: SERVICE_ID | ENTRY_FILE | PORT | BASE64_ZIP
+            String[] parts = payload.split("\\|");
+            String serviceId = parts[0];
+            String entryFile = parts[1];
+            String port = parts[2];
+            String base64Zip = parts[3];
+
+            WorkspaceManager.stageArchive(serviceId, base64Zip);
+            String absPath = WorkspaceManager.resolvePath(serviceId, entryFile);
+//            Payload expected by ServiceHandler: "FILENAME | SERVICE_ID | PORT"
+            String handlerPayload = absPath + "|" + serviceId + "|" + port;
+            handleSyncExecution(out, handlerPayload, "START_SERVICE");
+        } catch (Exception e){
+            e.printStackTrace();
+            try { TitanProtocol.send(out, TitanProtocol.OP_ERROR, "ARCHIVE_SERVICE_FAILED: " + e.getMessage()); } catch (IOException ignored) {}
         }
     }
 
@@ -375,6 +423,8 @@ public class RpcWorkerServer {
         System.out.println("Local Port: " + myPort);
         System.out.println("Target Scheduler: " + schedHost + ":" + schedPort);
         System.out.println("Capability: " + capability);
+
+        titan.tasks.ProcessRegistry.loadAndCleanUpProcesses();
 
         RpcWorkerServer rpcWorkerServer = new RpcWorkerServer(myPort, schedHost, schedPort, capability);
         rpcWorkerServer.start();

@@ -1,9 +1,11 @@
 package titan.scheduler;
 
+import titan.filesys.AssetManager;
 import titan.network.TitanProtocol;
 import titan.network.RpcClient;
 import titan.network.SchedulerServer;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.*;
@@ -46,7 +48,7 @@ public class Scheduler {
 
     // This is related to log streaming
     private final Map<String, List<String>> liveLogBuffer = new ConcurrentHashMap<>();
-    private static final int MAX_LOG_LINES = 1000;
+    private static final int MAX_LOG_LINES = 100;
 
     public Scheduler(int port){
         workerRegistry = new WorkerRegistry();
@@ -580,8 +582,6 @@ public class Scheduler {
                         System.out.println("[AFFINITY] Child " + waitingJob.getId() + " locked to Parent's Node: " + workerPortId);
                     }
                 }
-
-                System.out.println("[DAG] Setting Affinity for child " + waitingJob.getId() + " -> Worker " + workerPortId);
             }
         }
     }
@@ -602,11 +602,24 @@ public class Scheduler {
         // This handles the case with DAG request to get the next potential command
         // 1. STRIP THE SKILL PREFIX (e.g. "GENERAL|RUN_..." -> "RUN_...")
         // We look for the first pipe. If the second part looks like a command, we use that.
+//        if (rawPayload.contains("|")) {
+//            String[] parts = rawPayload.split("\\|", 2);
+//            String potentialCommand = parts[1];
+//
+//            if (potentialCommand.startsWith("DEPLOY_PAYLOAD") || potentialCommand.startsWith("RUN_PAYLOAD")) {
+//                actualPayload = potentialCommand;
+//            }
+//        }
+
         if (rawPayload.contains("|")) {
             String[] parts = rawPayload.split("\\|", 2);
             String potentialCommand = parts[1];
-
-            if (potentialCommand.startsWith("DEPLOY_PAYLOAD") || potentialCommand.startsWith("RUN_PAYLOAD")) {
+            // Add detection for ARCHIVE commands
+            if (potentialCommand.startsWith("RUN_ARCHIVE") ||
+                    potentialCommand.startsWith("START_ARCHIVE_SERVICE")) {
+                actualPayload = potentialCommand;
+            } else if (potentialCommand.startsWith("DEPLOY_PAYLOAD") ||
+                    potentialCommand.startsWith("RUN_PAYLOAD")) {
                 actualPayload = potentialCommand;
             }
         }
@@ -617,6 +630,11 @@ public class Scheduler {
             return executeDeploySequence(job, worker, actualPayload);
         } else if (actualPayload.startsWith("RUN_PAYLOAD")) {
             return executeRunOneOff(job, worker, actualPayload);
+        } else if (actualPayload.startsWith("RUN_ARCHIVE")) {
+            return executeRunArchive(job, worker, actualPayload);
+        }
+        else if (actualPayload.startsWith("START_ARCHIVE_SERVICE")) {
+            return executeServiceArchive(job, worker, actualPayload);
         }
         else {
             return executeStandardTask(job, worker, actualPayload);
@@ -744,6 +762,7 @@ public class Scheduler {
         }
     }
 
+
     private String executeRunOneOff(Job job, Worker worker, String payload) throws Exception {
         String[] parts = payload.split("\\|");
 
@@ -792,6 +811,46 @@ public class Scheduler {
         String payloadWithId = job.getId() + "|" + filename + "|" + args;
 //        String runPayload = "RUN_PAYLOAD|" + filename + "|" + job.getId();
         return sendExecuteCommand(worker, TitanProtocol.OP_RUN, payloadWithId);
+    }
+
+    private String executeRunArchive(Job job, Worker worker, String payload) throws Exception {
+        String [] parts = payload.split("\\|");
+
+        String pointer = parts[1];
+//        String args = (parts.length > 2) ? parts[2] : "";
+
+        AssetManager.ArchiveInfo fileInfo = AssetManager.resolvePointer(pointer);
+
+        String workerPayload = job.getId() + "|" + fileInfo.entryPoint + "|" + fileInfo.base64Content;
+
+        System.out.println("[ARCHIVE] Dispatching Archive Job " + job.getId() + " (Zip: " + fileInfo.zipName + ")");
+
+        return sendExecuteCommand(worker, TitanProtocol.OP_RUN_ARCHIVE, workerPayload);
+
+    }
+
+    private String executeServiceArchive(Job job, Worker worker, String payload) throws Exception {
+        // Payload Format: START_ARCHIVE_SERVICE | zip_name.zip/entry.py | args | port
+        String[] parts = payload.split("\\|");
+
+        String pointer = parts[1];
+        String args = (parts.length > 2) ? parts[2] : "";
+        String port = (parts.length > 3) ? parts[3] : "8085";
+
+        AssetManager.ArchiveInfo fileInfo = AssetManager.resolvePointer(pointer);
+
+        // Worker Protocol for Service Archive: SERVICE_ID | ENTRY_FILE | PORT | BASE64_ZIP
+        String workerPayload = job.getId() + "|" + fileInfo.entryPoint + "|" + port + "|" + fileInfo.base64Content;
+
+        System.out.println("🚀 [ARCHIVE] Starting Service " + job.getId() + " on Port " + port);
+
+        String response = sendExecuteCommand(worker, TitanProtocol.OP_START_SERVICE_ARCHIVE, workerPayload);
+
+        if (response.contains("DEPLOYED_SUCCESS")) {
+            liveServiceMap.put(job.getId(), worker);
+            worker.currentJobId = null; // Since the Services are detached
+        }
+        return response;
     }
 
     private String sendExecuteCommand(Worker worker, byte opCode, String payload) throws Exception {
@@ -898,23 +957,55 @@ public class Scheduler {
     }
 
     // Methods for sending the logs to stream to the UI
-    public void logStream(String jobId, String line){
-        liveLogBuffer.computeIfAbsent(jobId, k ->  Collections.synchronizedList(new ArrayList<>()));
+    public void logStream(String jobId, String line) {
+        liveLogBuffer.computeIfAbsent(jobId, k -> Collections.synchronizedList(new LinkedList<>()));
         List<String> logs = liveLogBuffer.get(jobId);
 
-        synchronized (logs){
-            if(logs.size() >= MAX_LOG_LINES){
+        synchronized (logs) {
+            logs.add(line);
+            // Aggressively remove old logs from RAM
+            while (logs.size() > MAX_LOG_LINES) {
                 logs.remove(0);
             }
-            logs.add(line);
         }
 
-//        System.out.println("[STREAM][" + jobId + "] " + line);
+        appendLogToDisk(jobId, line);
+    }
+
+    private void appendLogToDisk(String jobId, String line) {
+        File directory = new File("titan_server_logs");
+        if (!directory.exists()) {
+            boolean created = directory.mkdirs(); // Force create the directory
+            if (created) System.out.println("[INFO] Created log directory: titan_server_logs");
+        }
+
+        File logFile = new File(directory, jobId + ".log");
+
+        try (FileWriter fw = new FileWriter("titan_server_logs/" + jobId + ".log", true)) {
+            fw.write(line + "\n");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     // Helper method for the UI to retrieve the logs
+//    public List<String> getLogs(String jobId) {
+//        return liveLogBuffer.getOrDefault(jobId, new ArrayList<>());
+//    }
+
     public List<String> getLogs(String jobId) {
-        return liveLogBuffer.getOrDefault(jobId, new ArrayList<>());
+        List<String> logs = liveLogBuffer.get(jobId);
+
+        if (logs == null) {
+            return new ArrayList<>();
+        }
+
+        // Return a COPY or Snapshot
+        // This prevents ConcurrentModificationException when the UI loops over the logs
+        // while the worker is simultaneously adding new ones.
+        synchronized (logs) {
+            return new ArrayList<>(logs);
+        }
     }
 
     public String getSystemStats() {

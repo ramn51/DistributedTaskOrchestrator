@@ -1,0 +1,23 @@
+name: "diamond-flow-style"
+version: "1.0"
+project: true
+
+jobs:
+  - id: "root"
+    type: "run"
+    file: "scripts/init.py"
+
+  - id: "left"
+    type: "run"
+    file: "src/processor.py"
+    depends_on: ["root"]
+
+  - id: "right"
+    type: "run"
+    file: "src/processor.py"
+    depends_on: ["root"]
+
+  - id: "sink"
+    type: "run"
+    file: "scripts/init.py"
+    depends_on: ["left", "right"]

@@ -1,0 +1,38 @@
+name: "titan-comprehensive-test"
+version: "1.0"
+project: true  # Activates Archive/Sandbox Mode
+
+jobs:
+  # SCENARIO 1: High Priority Task
+  - id: "step-1-init"
+    type: "run"
+    file: "scripts/init.py"
+    priority: 10              # Highest priority
+    args: "--mode reset"
+
+  # SCENARIO 2: Delayed Execution
+  - id: "step-2-fetch"
+    type: "run"
+    file: "src/processor.py"
+    args: "FETCH"
+    delay: 2                  # Wait 2 seconds before running
+    depends_on:
+      - "step-1-init"
+
+  # SCENARIO 3: Sticky Scheduling (Affinity)
+  # This job MUST run on the same worker that ran 'step-2-fetch'
+  - id: "step-3-process"
+    type: "run"
+    file: "src/processor.py"
+    args: "PROCESS_DATA"
+    affinity: true            # Sticky Flag
+    depends_on:
+      - "step-2-fetch"
+
+  # SCENARIO 4: Long-Running Service
+  - id: "step-4-server"
+    type: "service"
+    file: "src/server.py"
+    port: 9000
+    depends_on:
+      - "step-3-process"

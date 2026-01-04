@@ -1,0 +1,33 @@
+name: "fanout-test"
+version: "1.0"
+project: true
+
+jobs:
+  - id: "trigger"
+    type: "run"
+    file: "scripts/init.py"
+    args: "GO"
+
+  - id: "worker-1"
+    type: "run"
+    file: "src/processor.py"
+    args: "DATA_PART_1"
+    depends_on: ["trigger"]
+
+  - id: "worker-2"
+    type: "run"
+    file: "src/processor.py"
+    args: "DATA_PART_2"
+    depends_on: ["trigger"]
+
+  - id: "worker-3"
+    type: "run"
+    file: "src/processor.py"
+    args: "DATA_PART_3"
+    depends_on: ["trigger"]
+
+  - id: "worker-4"
+    type: "run"
+    file: "src/processor.py"
+    args: "DATA_PART_4"
+    depends_on: ["trigger"]
