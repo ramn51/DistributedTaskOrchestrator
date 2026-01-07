@@ -89,6 +89,9 @@ DASHBOARD_HTML = """
         .hist-meta { text-align: right; }
         .hist-time { display: block; font-size: 0.8em; color: #757575; }
 
+        /* Skill Badge Style */
+        .skill-badge { font-size: 0.7em; background: #424242; padding: 2px 6px; border-radius: 4px; color: #bbb; margin-left: 8px; vertical-align: middle; border: 1px solid #555;}
+
         .status-badge { font-weight: bold; font-size: 0.85em; padding: 2px 6px; border-radius: 4px; }
         .st-COMPLETED { color: #00e676; background: rgba(0, 230, 118, 0.1); }
         .st-FAILED { color: #ff5252; background: rgba(255, 82, 82, 0.1); }
@@ -114,10 +117,13 @@ DASHBOARD_HTML = """
 
     <div class="grid">
         {% for w in stats.workers %}
-        <div class="card" style="border-top: 4px solid #4CAF50;">
+        <div class="card" style="border-top: 4px solid {% if 'GPU' in w.capabilities %}#7c4dff{% else %}#4CAF50{% endif %};">
 
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3 style="margin:0;">Node :{{ w.port }}</h3>
+                <div>
+                    <h3 style="margin:0; display:inline;">Node :{{ w.port }}</h3>
+                    <span class="skill-badge">{{ w.capabilities }}</span>
+                </div>
                 <span style="background:#004d40; color:#00e676; padding:2px 8px; border-radius:4px; font-size:0.8em;">Load: {{ w.load }}</span>
             </div>
 

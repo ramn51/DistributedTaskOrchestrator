@@ -1150,6 +1150,7 @@ public class Scheduler {
         for (Worker w : safeWorkerList) {
             json.append("{");
             json.append("\"port\": ").append(w.port()).append(",");
+            json.append("\"capabilities\": \"").append(w.capabilities()).append("\",");
             json.append("\"load\": \"").append(w.getCurrentLoad()).append("/").append(w.getMaxCap()).append("\",");
 
             if (w.currentJobId != null) {
