@@ -17,6 +17,7 @@ from titan_sdk import TitanClient, TitanJob
 
 # HELPER: Get absolute path to the local scripts folder
 def get_script_path(script_name):
+    current_dir = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(current_dir, "scripts", script_name)
 
 def run_dynamic_pipeline():
@@ -31,8 +32,8 @@ def run_dynamic_pipeline():
         )
 
     # Strategy B: Deep (Distributed / Fan-Out)
-    job_root = TitanJob(job_id="DEEP_ROOT", filename=get_script_path("prepare_data.py")) # <--- FIX HERE
-    job_w1 = TitanJob(job_id="WORKER_1", filename=get_script_path("analyze_chunk.py"), parents=["DEEP_ROOT"]) # <--- FIX HERE
+    job_root = TitanJob(job_id="DEEP_ROOT", filename=get_script_path("prepare_data.py"))
+    job_w1 = TitanJob(job_id="WORKER_1", filename=get_script_path("analyze_chunk.py"), parents=["DEEP_ROOT"])
     job_w2 = TitanJob(job_id="WORKER_2", filename=get_script_path("analyze_chunk.py"), parents=["DEEP_ROOT"])
     deep_dag = [job_root, job_w1, job_w2]
 
@@ -40,8 +41,8 @@ def run_dynamic_pipeline():
     # In a real scenario, you might ping an API or check client.fetch_logs()
     print("[LOGIC] Checking Cluster Metrics...")
 
-    # Simulating a high-traffic event (e.g., Black Friday)
-    traffic_load = 70
+    # Simulating a high-traffic event
+    traffic_load = 90
 
     if traffic_load > 80:
         print(f"[CRITICAl] High Traffic ({traffic_load}%). Switching to 'FAST' pipeline to save resources.")

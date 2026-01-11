@@ -86,9 +86,9 @@ class TitanYAMLParser:
                 port=int(job_port),
                 parents=step.get('depends_on', []),
                 is_archive=is_archive,
-                priority=int(step.get('priority', 1)),
+                priority=priority,
                 delay=delay_ms,
-                affinity=bool(step.get('affinity', False)),
+                affinity=affinity,
                 requirement=req
             )
             jobs.append(job)

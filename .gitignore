@@ -30,7 +30,7 @@ bin/
 .DS_Store
 .idea
 
-titan_workspace/*
+/titan_workspace/*
 /titan_sdk/__pycache__/*
 titan_sdk/titan_sdk.egg-info/
 

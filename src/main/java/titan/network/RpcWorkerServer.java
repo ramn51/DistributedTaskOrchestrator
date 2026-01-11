@@ -423,7 +423,7 @@ public class RpcWorkerServer {
         String capability = "GENERAL";
         boolean isPermanent = false;
 
-        // 2. Parse Arguments (Order: port, schedHost, schedPort, capability)
+        // 2. Parse Arguments (Order: port, schedHost, schedPort, capability, isPermanent)
         if (args.length > 0) {
             try {
                 myPort = Integer.parseInt(args[0]);
@@ -442,8 +442,19 @@ public class RpcWorkerServer {
             }
         }
 
-        if (args.length > 3) capability = args[3];
-        if(args.length > 4) isPermanent = Boolean.parseBoolean(args[4]);
+        if (args.length > 3 && args[3] != null && !args[3].trim().isEmpty()) {
+            String arg3 = args[3].trim();
+            if (arg3.equalsIgnoreCase("true") || arg3.equalsIgnoreCase("false")) {
+                System.out.println("Detected boolean in Capability slot. Auto-correcting...");
+                capability = "GENERAL";
+                isPermanent = Boolean.parseBoolean(arg3);
+            } else {
+                capability = arg3;
+                if (args.length > 4) {
+                    isPermanent = Boolean.parseBoolean(args[4]);
+                }
+            }
+        }
 
         System.out.println("Starting Worker Server...");
         System.out.println("Local Port: " + myPort);

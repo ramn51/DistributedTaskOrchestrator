@@ -29,10 +29,25 @@ public class TitanWorker {
             if (args.length > 0) myPort = Integer.parseInt(args[0]);
             if (args.length > 1) masterHost = args[1];
             if (args.length > 2) masterPort = Integer.parseInt(args[2]);
-            if (args.length > 3) capability = args[3];
-            if (args.length > 4) isPermanent = Boolean.parseBoolean(args[4]);
+            if (args.length > 3 && !args[3].isEmpty()){
+                String arg3 = args[3];
+                // This is to validate if the given arg is for capability or for isPermanent
+                if (arg3.equalsIgnoreCase("true") || arg3.equalsIgnoreCase("false")) {
+                    System.out.println("Detected boolean in Capability slot. Assuming you meant 'isPermanent'" +
+                                        "Setting capability to default GENERAL");
+                    capability = "GENERAL";
+                    isPermanent = Boolean.parseBoolean(arg3);
+                } else {
+                    capability = arg3;
+
+                    // Only check args[4] if args[3] was NOT a boolean shift
+                    if (args.length > 4) {
+                        isPermanent = Boolean.parseBoolean(args[4]);
+                    }
+                }
+            }
         } catch (NumberFormatException e) {
-            System.err.println("❌ Invalid argument format. Usage: java -jar Worker.jar <Port> <MasterIP> <MasterPort>");
+            System.err.println("[ERROR] Invalid argument format. Usage: java -jar Worker.jar <Port> <MasterIP> <MasterPort>");
             return;
         }
 

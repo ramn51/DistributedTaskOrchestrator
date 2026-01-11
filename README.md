@@ -27,7 +27,7 @@ Titan is designed to grow with your system's complexity:
 
     - **Mental Model:** A self-hosted PM2 or HashiCorp Nomad.
 
-3. **Level 3: Agentic AI Runtime (The "Brain")**
+3. **Level 3: Agentic AI Runtime (The "Auto Pilot")**
 
     - _Advanced:_ Use the SDK to build self-modifying execution graphs where AI Agents spawn their own infrastructure to solve problems.
 
@@ -94,6 +94,54 @@ Titan orchestrates a diverse mix of primitives within a single dependency graph:
 
 ---
 
+---
+## 🎥 Demos in Action
+
+### 1. Control Plane: Dynamic DAG Execution
+*Watch Titan resolve dependencies and execute a multi-stage workflow where the path is decided at runtime.*
+[DRAG YOUR dynamic_dag.mp4 HERE]
+
+### 2. Elasticity: Reactive Auto-Scaling
+*Watch the cluster detect load, spawn a new Worker process automatically, and distribute tasks.*
+[DRAG YOUR titan_load_scaling.mp4 HERE]
+
+---
+### 🔽 Detailed Scenarios (Click to Expand)
+<details>
+  <summary><b>🎬 Scenario: GPU Affinity Routing</b> (Smart Scheduling)</summary>
+  <br>
+  <i>Shows tasks tagged with "GPU" bypassing general nodes to land on specific hardware.</i>
+  <br><br>
+  [DRAG YOUR GPU_Affinity_yaml.mp4 HERE]
+</details>
+
+<details>
+  <summary><b>🎬 Scenario: Parallel Execution (Fanout)</b></summary>
+  <br>
+  <i>Submitting a "Fanout" DAG to demonstrate non-blocking parallel execution across multiple workers.</i>
+  <br><br>
+  [DRAG YOUR fanout_yaml_dag.mp4 HERE]
+</details>
+
+<details>
+  <summary><b>🎬 Scenario: Basic Agent Deployment</b> (Hello World)</summary>
+  <br>
+  <i>Deploying a simple Python agent via YAML configuration to a general node.</i>
+  <br><br>
+  [DRAG YOUR titan_yaml_exec_general_node.mp4 HERE]
+</details>
+
+<details>
+  <summary><b>🎬 Scenario: Full Load Cycle (Scale Up & Descale)</b></summary>
+  <br>
+  <i>(Long Duration) A complete stress test showing the cluster scaling up under pressure and automatically decommissioning ephemeral nodes when the queue empties.</i>
+  <br><br>
+  [DRAG YOUR titan_load_descaling.mp4 HERE]
+</details>
+
+
+---
+
 ## 📂 The Data Plane (File System)
 
 Titan strictly separates "Source Artifacts" from "Runtime State" to ensure reproducibility.
@@ -140,8 +188,8 @@ cp target/titan-orchestrator-1.0-SNAPSHOT.jar perm_files/Worker.jar
 **Terminal 1: The Master (Scheduler)**
 
 ```bash
-# Starts the Brain on Port 9090
-java -cp perm_files/Worker.jar titan.TitanScheduler
+# Starts the Master Scheduler on Port 9090
+java -cp perm_files/Worker.jar titan.TitanMaster
 
 ```
 
@@ -243,7 +291,7 @@ jobs:
 
 ```
 
-**To run an example try   ``python titan_sdk\titan_cli.py deploy titan_test_suite\examples\yaml_based_static_tests\dag_structure_test``.**
+**To run an example try   ``python titan_sdk/titan_cli.py deploy titan_test_suite/examples/yaml_based_static_tests/dag_structure_test``.**
 **This runs the example inside titan_test_suite that will serve as base reference to use**
 
 **If you want to run a workflow but you want only the task to run on a GPU node**
@@ -269,7 +317,7 @@ jobs:
 
 **The test_suite has all the different examples of trying out**
 
-### Mode 2: Programmatic & Agentic Workflows
+### Mode 1.5: Programmatic & Dynamic Logic (Python SDK)
 
 *Best for: Conditional logic, Self-Healing loops, and Dynamic Infrastructure.*
 
@@ -305,7 +353,7 @@ else:
 ```python
 # Full code: examples/agentic_healer.py
 
-# The "Brain" Loop
+# The Core Loop
 logs = client.fetch_logs(job_id)
 
 if "Segfault" in logs:
@@ -322,6 +370,78 @@ if "Segfault" in logs:
 </p>
 
 ---
+
+## 📚 SDK Reference (Python)
+
+The `TitanClient` is your primary gateway for programmatic control.
+
+### 1. Core Classes
+
+#### `TitanClient`
+The main entry point for connecting to the cluster.
+
+```python
+from titan import TitanClient
+
+# Initialize
+client = TitanClient(host="localhost", port=9090)
+```
+
+|**Method**| **Description**                                                                            |
+|---|--------------------------------------------------------------------------------------------|
+|`client.submit_job(job: TitanJob)`| Dispatches a single job to the cluster.                                                    |
+|`client.submit_dag(name: str, jobs: list)`| Submits a list of linked `TitanJob` objects as a single DAG.                               |
+|`client.fetch_logs(job_id: str)`| Retrieves the stdout/stderr logs for a specific job ID.                                    |
+|`client.upload_project_folder(path, name)`| Zips and uploads a local folder to the Master's artifact registry in perm_files directory. |
+|`client.upload_file(filepath)`| Uploads a single file to the Master's artifact registry in perm_files dir.                 |
+
+#### `TitanJob`
+
+Represents a unit of work.
+```python
+from titan_sdk import TitanJob
+
+job = TitanJob(
+    job_id="train_v1",
+    filename="scripts/train.py",
+    requirement="GPU",     # Optional: "GPU" or "GENERAL"
+    priority=10,           # Optional: Higher numbers schedule first
+    parents=["data_prep"], # Optional: List of parent Job IDs
+    is_archive=False       # Set True if deploying a ZIP/Service
+)
+```
+
+#### 2. defining DAGs Programmatically
+
+You can build dependency graphs using the SDK's API instead of YAML.
+Python
+
+```python
+from titan_sdk import TitanClient, TitanJob
+
+client = TitanClient()
+
+# Step 1: Define the Jobs
+# "Extract" has no parents (Root node)
+task_a = TitanJob(
+    job_id="extract_data",
+    filename="etl/extract.py",
+    priority=5
+)
+
+# "Train" depends on "Extract"
+task_b = TitanJob(
+    job_id="train_model",
+    filename="ml/train.py",
+    requirement="GPU",
+    parents=["extract_data"] # <--- Defines the dependency
+)
+
+# Step 2: Submit them as a list
+client.submit_dag("nightly_pipeline", [task_a, task_b])
+print("DAG Submitted!")
+```
+
 
 ## 🖥️ Dashboard
 
@@ -420,8 +540,31 @@ titan_test_suite/
 
 ---
 
+## 📝 Limitations & Design Constraints
+
+Titan is a research runtime designed to explore the **primitives of orchestration** (Scheduling, IPC, State Management) without the complexity of existing frameworks. As such, certain "Production" features are explicitly out of scope for V1:
+
+1.  **Security (Open TCP):**
+    * The current implementation uses raw, unencrypted TCP sockets.
+    * *Constraint:* Do not run Titan on public networks (WAN) without a VPN or SSH Tunnel. Use strictly within a trusted VPC/LAN.
+
+2.  **Single Point of Failure (SPOF):**
+    * The Master node is currently a singleton. If the Master process dies, the cluster state is lost (Workers keep running but cannot receive new instructions).
+    * *Mitigation:* High Availability (HA) via Raft Consensus is planned for the v2.0 Roadmap.
+
+3.  **Network Topology:**
+    * Titan assumes a flat address space (all nodes can ping each other via IP). It does not currently handle NAT Traversal or complex Subnet routing.
+    
+4.  **Scaling Boundary (Process vs. Infrastructure):**
+    * Titan implements **Application-Level Scaling** (spawning new JVM worker processes on existing hardware).
+    * **Infrastructure Provisioning** is currently delegated to external tools.
+    * *Roadmap Item:* A "Cluster Autoscaler Interface" (Webhooks) is planned for v2.0, allowing Titan to trigger external APIs (e.g., Azure VM Scale Sets) when the cluster runs out of capacity.
+
+---
+
 ## 🔮 Roadmap
 
+* **Security & Auth (Planned):** Implement **mTLS (Mutual TLS)** for encrypted, authenticated communication between Master and Workers.
 * **Distributed Consensus:** Implement Raft/Paxos for Leader Election (Removing Master SPOF).
 * **Crash Recovery:** Implement Write-Ahead-Logging (WAL) for persistent state recovery after master failure.
 * **Containerization:** Support for Docker/Firecracker execution drivers for true filesystem isolation.

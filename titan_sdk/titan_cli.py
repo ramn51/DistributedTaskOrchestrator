@@ -41,7 +41,7 @@ def main():
         client = TitanClient()
         project_name = parser.get_project_name()
         
-        # --- UPLOAD STRATEGY ---
+        # UPLOAD STRATEGY
         if parser.is_project_mode():
             # STRATEGY A: Zip Entire Folder (Good for imports/dependencies)
             print(f"📦 [CLI] Packaging Project Mode: '{project_name}'...")
@@ -56,8 +56,6 @@ def main():
             # loads the file content into Base64 automatically when is_archive=False.
             # The Protocol handles the upload inline.
             pass 
-        
-        # -----------------------
 
         # 2. Submit the DAG
         jobs = parser.build_jobs()
