@@ -472,7 +472,7 @@ Titan includes a lightweight Python Flask dashboard to visualize cluster health.
 
 ```bash
 # Start the Dashboard
-python3 dashboard.py
+python3 ./perm_files/server_dashboard.py
 # Running on http://localhost:5000
 
 ```
