@@ -11,6 +11,27 @@ Designed for small-to-medium scale environments, it acts as a **Self-Hosting, Se
 </p>
 
 ---
+
+## Table of Contents
+- [Capability Spectrum](#capability-spectrum)
+- [Philosophy: One Runtime, Two Patterns](#philosophy-one-runtime-two-patterns)
+- [Key Features](#key-features)
+- [Demos in Action](#demos-in-action)
+- [The Data Plane (File System)](#the-data-plane-file-system)
+- [Getting Started](#getting-started)
+- [Operator Manual (CLI)](#-operator-manual-cli)
+- [Developer Manual](#-developer-manual-two-modes)
+- [SDK Reference](#-sdk-reference-python)
+- [Dashboard](#-dashboard)
+- [Architecture](#-architecture)
+- [Repository Guide](#repository-guide)
+- [Testing Strategy](#testing-strategy)
+- [Limitations & Design Constraints](#limitations--design-constraints)
+- [Roadmap](#roadmap)
+
+---
+
+
 ## Capability Spectrum
 
 Titan is designed to grow with your system's complexity:
