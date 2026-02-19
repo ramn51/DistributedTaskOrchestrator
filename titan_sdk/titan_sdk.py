@@ -24,6 +24,10 @@ OP_SUBMIT_DAG = 4
 OP_LOG_BATCH = 0x17
 OP_GET_LOGS = 0x16
 OP_UPLOAD_ASSET = 0x53
+OP_KV_SET = 0x60
+OP_KV_GET = 0x61
+OP_KV_SADD = 0x62
+OP_KV_SMEMBERS = 0x63
 
 class TitanJob:
     def __init__(self, job_id, filename, job_type="RUN_PAYLOAD", args=None,
@@ -111,6 +115,34 @@ class TitanClient:
     
     def fetch_logs(self, job_id):
         return self._send_request(OP_GET_LOGS, job_id)
+
+    def store_put(self, key, value):
+        """Saves a string value to the distributed store (Redis)"""
+        payload = f"{key}|{value}"
+        return self._send_request(OP_KV_SET, payload)
+
+    def store_get(self, key):
+        """Retrieves a string value from the distributed store"""
+        return self._send_request(OP_KV_GET, key)
+
+    def store_sadd(self, key, member):
+        """Adds a member to a set. Returns 1 if new, 0 if exists."""
+        payload = f"{key}|{member}"
+        resp = self._send_request(OP_KV_SADD, payload)
+        try:
+            return int(resp)
+        except:
+            return 0
+        
+    def store_smembers(self, key):
+        """Returns a python list of all members in the set."""
+        resp = self._send_request(OP_KV_SMEMBERS, key)
+        
+        if not resp:
+            return []
+        
+        # Split CSV back into list
+        return resp.split(",")
 
     def upload_file(self, filepath):
         """Uploads a single file to Master's perm_files"""
@@ -242,13 +274,30 @@ class TitanClient:
         finally:
             if s: s.close()
 
+    # def _recv_exact(self, sock, n):
+    #     data = b''
+    #     while len(data) < n:
+    #         try:
+    #             packet = sock.recv(n - len(data))
+    #             if not packet: return None
+    #             data += packet
+    #         except:
+    #             return data if len(data) > 0 else None
+    #     return data
+
     def _recv_exact(self, sock, n):
-        data = b''
+        """Robustly receive exactly n bytes from the socket."""
+        data = bytearray() # Use bytearray for efficient appending
         while len(data) < n:
             try:
-                packet = sock.recv(n - len(data))
-                if not packet: return None
-                data += packet
-            except:
-                return data if len(data) > 0 else None
-        return data
+                packet = sock.recv(min(n - len(data), 8192))
+                if not packet:
+                    # Connection closed early
+                    return None
+                data.extend(packet)
+            except socket.timeout:
+                # If we have some data, return it; otherwise, it's a true timeout
+                return bytes(data) if data else None
+            except Exception:
+                return None
+        return bytes(data)

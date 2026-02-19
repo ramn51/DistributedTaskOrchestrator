@@ -27,6 +27,8 @@ import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.DelayQueue;
+import titan.TitanConfig;
+import titan.storage.TitanJRedisAdapter;
 
 public class Scheduler {
     private final WorkerRegistry workerRegistry;
@@ -42,6 +44,13 @@ public class Scheduler {
     private final ExecutorService serverExecutor;
     private volatile boolean isRunning = true;
     private int port;
+
+    private int redisPort = TitanConfig.getInt("titan.redis.port", 6379);
+    private String redisHost = TitanConfig.get("titan.redis.host", "localhost");
+
+
+    // JRedis config
+    private final TitanJRedisAdapter redis;
 
     // This is purely for validation purpose
     private final Map<String, TaskExecution> executionHistory = new ConcurrentHashMap<>();
@@ -79,6 +88,11 @@ public class Scheduler {
         this.heartBeatExecutor = Executors.newSingleThreadScheduledExecutor();
         this.dispatchExecutor = Executors.newSingleThreadExecutor();
         this.serverExecutor = Executors.newSingleThreadExecutor();
+
+        String rHost = TitanConfig.get("titan.redis.host", "localhost");
+        int rPort = TitanConfig.getInt("titan.redis.port", 6379);
+        this.redis = new TitanJRedisAdapter(redisHost, redisPort);
+
         try{
             this.schedulerServer = new SchedulerServer(port, this);
         } catch (IOException e){
@@ -105,6 +119,16 @@ public class Scheduler {
 
     public void start(){
         System.out.println("Scheduler Core starting at port " + this.port);
+        try {
+            redis.connect();
+            if(redis.isConnected()){
+                System.out.println("[INFO] Redis Persistence Layer Active");
+                // Perform State recovery once connected for failed jobs
+                recoverState();
+            }
+        } catch (IOException e) {
+            System.err.println("[INFO][FAILED] Redis connection failed: " + e.getMessage());
+        }
 
 //        new Thread(() -> schedulerServer.start()).start();
         serverExecutor.submit(() -> {
@@ -132,6 +156,10 @@ public class Scheduler {
                 t.printStackTrace();
             }
         });
+    }
+
+    public TitanJRedisAdapter getRedis(){
+        return this.redis;
     }
 
     public WorkerRegistry getWorkerRegistry(){
@@ -265,11 +293,18 @@ public class Scheduler {
             if(result  == null){
                 workerRegistry.markWorkerDead(worker.host(), worker.port());
             } else if(result.startsWith("PONG")){
+                String workerKey = worker.host() + ":" + worker.port();
+
+                safeRedisSadd("system:live_workers", workerKey);
+
                 worker.updateLastSeen();
                 String[] parts = result.split("\\|");
                 if (parts.length > 1) {
                     int load = Integer.parseInt(parts[1]);
                     worker.setCurrentLoad(load);
+
+                    safeRedisSet("worker:" + workerKey + ":load", String.valueOf(worker.getCurrentLoad()));
+
                     if(load > 0){
                         System.out.println("Worker " + worker.port() + "Has load" + worker.getCurrentLoad());
                     }
@@ -322,6 +357,14 @@ public class Scheduler {
     }
 
     public void submitJob(Job job){
+        // Persist to Redis to act as WAL
+        // This will be the basis for recovery
+        safeRedisSet("job:" + job.getId() + ":payload", job.getPayload());
+        safeRedisSet("job:" + job.getId() + ":status", "PENDING");
+        safeRedisSet("job:" + job.getId() + ":priority", String.valueOf(job.getPriority()));
+        safeRedisSet("job:" + job.getId() + ":delay", String.valueOf(job.getScheduledTime()));
+        safeRedisSadd("system:active_jobs", job.getId());
+
         System.out.println("[INFO] [DAG] Job " + job.getId() + " is waiting.");
         if (!job.isReady()) {
             System.out.println("[INFO] Job " + job.getId() + " blocked by dependencies. Entering DAG Waiting Room.");
@@ -468,6 +511,122 @@ public class Scheduler {
         return "GENERAL";
     }
 
+    public void redisKVSet(String key, String value){
+        safeRedisSet(key, value);
+    }
+
+    public void redisSetAdd(String key, String value){
+        safeRedisSadd(key, value);
+    }
+
+    public String redisKVGet(String key){
+        try {
+            return redis.get(key);
+        } catch (Exception e) {
+            System.err.println("[INFO][FAILED][RECOVERY] Failed to fetch active jobs: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private void safeRedisSet(String key, String value) {
+        try {
+            redis.set(key, value);
+        } catch (IOException e) {
+            System.err.println("[WARN] Redis SET failed for " + key + ": " + e.getMessage());
+        }
+    }
+
+    // Methods related to Redis for persistance
+    private void safeRedisSadd(String key, String member) {
+        try {
+            redis.sadd(key, member);
+        } catch (IOException e) {
+            System.err.println("[WARN] Redis SADD failed for " + key + ": " + e.getMessage());
+        }
+    }
+
+    private void safeRedisSrem(String key, String member) {
+        try {
+            redis.srem(key, member);
+        } catch (Exception e) { // Catch Exception broadly as srem isn't in interface yet maybe
+            System.err.println("[WARN] Redis SREM failed for " + key + ": " + e.getMessage());
+        }
+    }
+
+    public Set<String> safeRedisSMembers(String key) {
+        try {
+            return redis.smembers(key);
+        } catch (Exception e) { // Catch Exception broadly as srem isn't in interface yet maybe
+            System.err.println("[WARN] Redis SREM failed for " + key + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    private void recoverState(){
+        if(!redis.isConnected()){
+            System.out.println("[INFO][WARN] Redis not connected");
+            return;
+        }
+
+        System.out.println("[INFO][RECOVERY] Scanning for orphaned jobs...");
+        Set<String> activeIds = Collections.emptySet();
+        try {
+            activeIds = redis.smembers("system:active_jobs");
+        } catch (Exception e) {
+            System.err.println("[INFO][FAILED][RECOVERY] Failed to fetch active jobs: " + e.getMessage());
+            return;
+        }
+
+        if (activeIds.isEmpty()) {
+            System.out.println("[INFO][RECOVERY] No stranded jobs found.");
+            return;
+        }
+
+        int recoveredCount = 0;
+
+        for(String jobId: activeIds){
+            try{
+                String status = redis.get("job:" + jobId + ":status");
+                String payload = redis.get("job:" + jobId + ":payload");
+                if (payload == null || status == null) {
+                    System.err.println("[INFO][ERROR][RECOVERY] Corrupt job found: " + jobId + ". Removing.");
+                    safeRedisSrem("system:active_jobs", jobId);
+                    continue;
+                }
+
+                String priStr = redis.get("job:" + jobId + ":priority");
+                String delayStr = redis.get("job:" + jobId + ":delay");
+                int priority = (priStr != null) ? Integer.parseInt(priStr) : 1;
+                long scheduledTime = (delayStr != null) ? Long.parseLong(delayStr) : 0;
+
+                // Calculate remaining delay (if it was a future job)
+                long remainingDelay = Math.max(0, scheduledTime - System.currentTimeMillis());
+
+                Job job = new Job(payload, priority, remainingDelay);
+                job.setId(jobId);
+                job.setStatus(Job.Status.PENDING); // Force reset to Pending
+
+                if ("COMPLETED".equals(status) || "DEAD".equals(status)) {
+                    // Should have been removed, but if it's here, clean it.
+                    safeRedisSrem("system:active_jobs", jobId);
+                } else {
+                    System.out.println("[INFO][RECOVERY] Restoring Job " + jobId + " (Was " + status + ")");
+                    // We bypass submitJob() to avoid writing to Redis again needlessly but we need the queue logic.
+                    if (remainingDelay > 0) {
+                        waitingRoom.add(new ScheduledJob(job));
+                    } else {
+                        taskQueue.add(job);
+                    }
+                    recoveredCount++;
+                }
+
+            } catch (Exception e) {
+                System.err.println("[ERROR][RECOVERY] Error restoring " + jobId + ": " + e.getMessage());
+            }
+        }
+        System.out.println("[INFO][RECOVERY] Complete. Restored " + recoveredCount + " jobs.");
+    }
+
     private void runDispatchLoop() throws InterruptedException {
         System.out.println("Running Dispatch Loop");
         while (isRunning) {
@@ -510,6 +669,9 @@ public class Scheduler {
                 TaskExecution record = new TaskExecution(job.getId(), selectedWorker);
                 executionHistory.put(job.getId(), record);
                 runningJobs.put(job.getId(), job);
+
+                safeRedisSet("job:" + job.getId() + ":status", "RUNNING");
+                safeRedisSet("job:" + job.getId() + ":worker", String.valueOf(selectedWorker.port()));
 
 //                Worker selectedWorker = availableWorkers.get(ThreadLocalRandom.current().nextInt(availableWorkers.size()));
                 System.out.println("[INFO] Dispatching " + job.getId() + " to Worker " + selectedWorker.port());
@@ -577,6 +739,10 @@ public class Scheduler {
         if(job.getRetryCount() > 3) {
             job.setStatus(Job.Status.DEAD);
 
+            safeRedisSet("job:" + job.getId() + ":status", "DEAD");
+            //  Remove from active set since it is dead
+            safeRedisSrem("system:active_jobs", job.getId());
+
             if (record != null) record.status = Job.Status.DEAD;
 //            history.put(job.getId(), Job.Status.DEAD);
             System.err.println("Job Moved to DLQ (Max Retries): " + job);
@@ -587,6 +753,8 @@ public class Scheduler {
             job.setStatus(Job.Status.FAILED);
             System.err.println("Job Failed. Retrying... (" + job.getRetryCount() + "/3)");
             job.setStatus(Job.Status.PENDING);
+
+            safeRedisSet("job:" + job.getId() + ":status", "PENDING");
             // We leave the record as FAILED for now so history shows it failed
             //history.put(job.getId(), Job.Status.PENDING);
             taskQueue.offer(job);
@@ -641,7 +809,14 @@ public class Scheduler {
     private void completeJob(Job job, String result, TaskExecution record){
         record.complete(result);
 
-        if (job != null) job.setStatus(Job.Status.COMPLETED);
+        if (job != null) {
+            job.setStatus(Job.Status.COMPLETED);
+            safeRedisSet("job:" + job.getId() + ":status", "COMPLETED");
+            safeRedisSet("job:" + job.getId() + ":result", result);
+
+            // Remove from active set as it is completed.
+            safeRedisSrem("system:active_jobs", job.getId());
+        }
 
         if (record.assignedWorker != null) {
             String wKey = String.valueOf(record.assignedWorker.port());
@@ -872,17 +1047,22 @@ public class Scheduler {
         String args = "";
         String base64Script = "";
 
-        if (parts[2].length() > 50) {
-            base64Script = parts[2];
-            args = "";
-        }
-        // If parts[2] is small, it's likely ARGS, so the Base64 must be in parts[3]
-        else if (parts.length >= 4) {
+//        if (parts[2].length() > 200) {
+//            base64Script = parts[2];
+//            args = "";
+//        }
+        if (parts.length >= 4) {
+            // Case 1 --> We have 4+ parts.
+            // Structure must be: HEADER | FILENAME | ARGS | CODE | [REQ]
             args = parts[2];
             base64Script = parts[3];
         }
         else {
+            // Case 2: We have exactly 3 parts.
+            // Structure must be: HEADER | FILENAME | CODE
+            // (Arguments are implied to be empty)
             // Fallback for short scripts without args
+            args = "";
             base64Script = parts[2];
         }
 

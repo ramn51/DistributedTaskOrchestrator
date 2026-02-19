@@ -329,8 +329,6 @@ public class SchedulerServer {
                 return String.join("\n", logs);
 
 
-
-
             case TitanProtocol.OP_UPLOAD_ASSET:
                 // Payload format: "FILENAME | BASE64_CONTENT"
                 String uploadParts[] = payload.split("\\|", 2);
@@ -369,6 +367,35 @@ public class SchedulerServer {
                     return "ERROR_READING_FILE: " + e.getMessage();
                 }
 
+            case TitanProtocol.OP_KV_SET:
+                parts = payload.split("\\|", 2);
+                if(parts.length < 2) return "ERROR: Invalid Format";
+                // Prefix 'user:' for safety
+                scheduler.redisKVSet("user:" + parts[0], parts[1]);
+                return "OK";
+
+            case TitanProtocol.OP_KV_GET:
+                String val = scheduler.redisKVGet("user:" + payload);
+                return val == null ? "NULL" : val;
+
+            // These are called and used by sdk
+            case TitanProtocol.OP_KV_SADD:
+                // Payload: key|member
+                parts = payload.split("\\|", 2);
+                if(parts.length < 2) return "ERROR: Invalid Format";
+                scheduler.redisSetAdd("user:" + parts[0], parts[1]);
+                return "0"; // Returns "1" (added) or "0" (duplicate)
+
+            case TitanProtocol.OP_KV_SMEMBERS:
+                // Payload: key
+                java.util.Set<String> members = scheduler.safeRedisSMembers("user:" + payload);
+                if (members == null || members.isEmpty()) {
+                    return "";
+                }
+                
+                // Flatten Set to CSV (e.g., "item1,item2,item3")
+                return String.join(",", members);
+
 
             default:
                 return "UNKNOWN_OPCODE: " + packet.opCode;
@@ -380,11 +407,11 @@ public class SchedulerServer {
         File root = new File(PERM_FILES_DIR);
         if (!root.exists()) return null;
 
-        // 1. Try Direct Path
+        // Check Direct Path
         File direct = new File(root, fileName);
         if (direct.exists()) return direct;
 
-        // 2. Recursive Search
+        // Recursive Search
         try (java.util.stream.Stream<java.nio.file.Path> walk = Files.walk(root.toPath())) {
             return walk.filter(p -> !Files.isDirectory(p))
                     .filter(p -> p.getFileName().toString().equals(fileName))

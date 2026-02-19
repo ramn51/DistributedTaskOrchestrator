@@ -213,6 +213,8 @@ public class Job implements Comparable<Job> {
         return status;
     }
 
+    public int getPriority(){return priority;}
+
     public void incrementRetry() {
         this.retryCount++;
     }

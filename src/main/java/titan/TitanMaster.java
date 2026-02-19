@@ -25,6 +25,10 @@ public class TitanMaster {
 
         scheduler.startAutoScaler();
 
+        String redisHost = TitanConfig.get("titan.redis.host", "localhost");
+        int redisPort = TitanConfig.getInt("titan.redis.port", 6379);
+        int heartBeat = TitanConfig.getInt("titan.worker.heartbeat.interval", 10);
+
         // Keep main thread alive
         try {
             Thread.currentThread().join();
