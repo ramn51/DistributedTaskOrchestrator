@@ -396,6 +396,11 @@ public class SchedulerServer {
                 // Flatten Set to CSV (e.g., "item1,item2,item3")
                 return String.join(",", members);
 
+            case TitanProtocol.OP_GET_JOB_STATUS:
+                // Payload will be the full job ID (e.g., "DAG-test_job_123")
+                String status = scheduler.redisKVGet("job:" + payload + ":status");
+                return status == null ? "NULL" : status;
+
 
             default:
                 return "UNKNOWN_OPCODE: " + packet.opCode;

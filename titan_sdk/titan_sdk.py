@@ -28,6 +28,7 @@ OP_KV_SET = 0x60
 OP_KV_GET = 0x61
 OP_KV_SADD = 0x62
 OP_KV_SMEMBERS = 0x63
+OP_GET_JOB_STATUS = 0x55
 
 class TitanJob:
     def __init__(self, job_id, filename, job_type="RUN_PAYLOAD", args=None,
@@ -143,6 +144,10 @@ class TitanClient:
         
         # Split CSV back into list
         return resp.split(",")
+
+    def get_job_status(self, job_id):
+        """Securely queries the Master for a job's internal system status."""
+        return self._send_request(OP_GET_JOB_STATUS, job_id)
 
     def upload_file(self, filepath):
         """Uploads a single file to Master's perm_files"""

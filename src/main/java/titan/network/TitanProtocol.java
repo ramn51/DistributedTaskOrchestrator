@@ -57,6 +57,7 @@ public class TitanProtocol {
     public static final byte OP_KV_GET            = 0x61;
     public static final byte OP_KV_SADD           = 0x62;
     public static final byte OP_KV_SMEMBERS       = 0x63;
+    public static final byte OP_GET_JOB_STATUS    = 0x55;
     /**
      * SEND: Wraps the payload in our 8-byte header.
      * [ Version(1) | OpCode(1) | Flags(1) | Spare(1) | Length(4) ] + [ Payload ]
