@@ -1,11 +1,34 @@
 # 🛰️ Titan: The Hybrid Distributed Runtime
 
-**Titan** is a lightweight distributed orchestrator built to bridge the gap between **Static Job Schedulers** (like Airflow) and **Dynamic Agent Runtimes**.
+**Titan** is a lightweight distributed execution runtime designed to bridge the gap between:
 
-Designed for small-to-medium scale environments, it acts as a **Self-Hosting, Self-Healing Micro-PaaS**. It synthesizes the core primitives of orchestration—resolving dependencies, managing worker lifecycles, and handling resource governance—into a single, zero-dependency binary.
+* Logical DAG Orchestrators (e.g. Airflow / Dagster)  
+* Dynamic Agent Runtimes (LLM-driven systems)
+* Service Schedulers (Micro-PaaS for long-running APIs)
 
-> *Built from scratch in Java (Core Engine) and Python (SDK). Features a custom binary protocol for internal signaling and a native Redis-like persistence layer ([TitanStore](https://github.com/ramn51/RedisJava)), creating a standalone orchestration runtime with zero external database dependencies.*
+Traditional workflow engines are responsible for deciding task order.
 
+Titan is responsible for deciding:
+
+- **Where it runs** _(Enforcing data locality and node affinity)_  
+- **How it dynamically scales** _(Real-time load detection for auto-scaling up and graceful descale)_
+- **How execution survives failure** _(Zero-loss state recovery via TitanStore AOF)_
+- **Which hardware executes which task** _(Capability-based GPU vs. CPU routing)_
+- **When infrastructure self-replicates** _(Autonomous spawning of ephemeral workers)_
+
+Designed for small-to-medium scale environments, Titan acts as a
+**Self-Hosting, Self-Healing Execution Substrate** capable of running:
+
+• Static pipelines  
+• Long-running services  
+• Runtime-defined DAGs  
+• Agent-generated execution graphs
+
+All within a single zero-dependency binary.
+
+> *Built from scratch in Java (Core Engine) and Python (SDK). Features a custom binary protocol for internal signaling and an append-only execution log via a native Redis-like persistence layer ([TitanStore](https://github.com/ramn51/RedisJava)), enabling replayable DAG execution without requiring an external database.*
+
+ 
 <p align="center">
   <img src="/screenshots/Titan_L1_diagram.png" alt="Titan High Level Architecture" width="800"/>
 </p>
@@ -48,11 +71,13 @@ Titan is designed to grow with your system's complexity:
 
     - **Mental Model:** A self-hosted PM2 or HashiCorp Nomad.
 
-3. **Level 3: Agentic AI Runtime (The "Auto Pilot")**
+3. **Level 3: Agentic Execution Runtime (The "Autonomous Mode")**
 
-    - _Advanced:_ Use the SDK to build self-modifying execution graphs where AI Agents spawn their own infrastructure to solve problems.
+    - _Advanced:_ Programmatically construct execution graphs at runtime
+      where software agents spawn downstream compute tasks conditionally.
 
-    - **Mental Model:** Infrastructure-aware LangChain.
+    - **Mental Model:** Infrastructure-aware execution substrate for
+      runtime-defined workflows.
 ---
 
 ## Philosophy: One Runtime, Two Patterns
@@ -65,12 +90,16 @@ Titan recognizes that Modern Infrastructure requires two distinct ways of workin
 * **Use Case:** Nightly ETL, Database Backups, Periodic Reports.
 * **Workflow:** Define your infrastructure in a declarative `pipeline.yaml` and submit it.
 
-### 2. Dynamic Agentic Workflows (The "AI" Path)
+### 2. Runtime-Defined Workflows (Agentic Mode)
 
 * **Requirement:** The **Titan Python SDK**.
 * **Definition:** The execution graph is constructed *at runtime* based on logic or LLM decisions.
 * **Use Case:** AI Agents, Self-Healing Loops, Recursive Web Scraping.
 * **Workflow:** Programmatically construct graphs where the "Next Step" depends on the "Previous Output" (e.g., *Run  Error  Generate Fix  Retry*).
+
+> This allows Titan to function as an execution backend for agentic
+systems where task graphs are generated dynamically based on
+intermediate outputs (e.g., model inference or system telemetry).
 
 ---
 
@@ -307,7 +336,7 @@ Worker Status:
 
 
 
-##  Developer Manual (Two Modes)
+##  Developer Manual (Three Modes)
 
 ### Mode 1: Static Pipelines (YAML)
 
@@ -390,6 +419,11 @@ else:
 
 ### Mode 2: Agentic Workflows (Python SDK)
 
+In this mode, Titan allows software agents to construct and submit
+execution graphs at runtime based on intermediate outputs (e.g.,
+LLM inference), enabling infrastructure-aware workflows where the
+task graph itself is generated dynamically during execution.
+
 *Best for: AI Agents, Self-Healing loops, and Dynamic logic.*
 
 **The "Self-Healing" Loop**
@@ -417,6 +451,10 @@ if "Segfault" in logs:
 *Best for: Enterprise environments that want Dagster's UI and data lineage, but Titan's hardware-aware compute.*
 
 In this mode, Dagster acts as the Control Plane (managing logic/UI), while Titan acts as the Data Plane (managing physical execution and GPU routing).
+
+In this configuration, Dagster becomes the logical DAG layer while
+Titan assumes responsibility for physical execution turning a
+control-plane-only scheduler into a hardware-aware distributed runtime.
 
 **For this refer the example inside ```titan_test_suite/examples/dagster_integration```**
 - *execute it as ```dagster dev -f pipeline.py```*
