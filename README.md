@@ -7,6 +7,13 @@
 
 Titan is a zero-dependency distributed runtime built from first principles to solve the **"Physical Execution"** problem. It bridges the gap between static orchestrators (Airflow), dynamic AI agents, and long-running micro-services.
 
+**What can Titan run?**
+
+**Static Pipelines:** Deterministic ETL and DevOps workflows.
+**Long-Running Services:** Persistent APIs and servers with auto-restart.
+**Runtime-Defined DAGs:** Execution graphs built on-the-fly via logic.
+**Agentic Workflows:** Complex graphs generated dynamically by LLMs.
+
 **Titan handles the heavy lifting of distributed systems:**
 *  **Parallelism:** Executing massive fan-out workloads across the cluster with non-blocking task distribution.
 *  **Locality:** Enforcing strict data-to-node affinity.
@@ -17,12 +24,12 @@ Titan is a zero-dependency distributed runtime built from first principles to so
 ### 📖 [Explore the Full Documentation and Quickstart](https://ramn51.github.io/titan-orchestrator/getting-started/)
 
 <p align="center">
-  <img src="./screenshots/Titan_L1_diagram.png" alt="Titan High Level Architecture" width="800"/>
+  <img src="./screenshots/Titan_L1_diagram_final.png" alt="Titan High Level Architecture" width="800"/>
 </p>
 
 ---
 
-## 📈 The Capability Spectrum
+## The Capability Spectrum
 
 Titan scales with your complexity, from a simple script runner to an autonomous agent host:
 
@@ -35,7 +42,7 @@ Titan scales with your complexity, from a simple script runner to an autonomous 
 
 ---
 
-## 🧠 One Runtime, Two Patterns
+## One Runtime, Two Patterns
 
 | Feature | Static Workflows (DevOps) | Runtime-Defined (Agentic) |
 | :--- | :--- | :--- |
@@ -45,7 +52,7 @@ Titan scales with your complexity, from a simple script runner to an autonomous 
 
 ---
 
-## 🛠️ Key Features
+## Key Features
 
 ### 1. Universal Workload Support
 Orchestrate ephemeral scripts, long-running services, and hybrid DAGs (e.g., Python script → Java Service → Shell cleanup) in a single zero-dependency binary.
@@ -65,7 +72,7 @@ Orchestrate ephemeral scripts, long-running services, and hybrid DAGs (e.g., Pyt
 
 ---
 
-## 🎬 Demos in Action
+## Demos in Action
 
 ### 1. Control Plane: Dynamic DAG Execution
 *Watch Titan resolve dependencies and execute a multi-stage workflow where the path is decided at runtime.*
@@ -93,7 +100,7 @@ https://github.com/user-attachments/assets/3f7d41df-654a-45d9-a49e-85978fad9172
 
 ---
 
-## ⚖️ License & Attribution
+## License & Attribution
 
 Titan Orchestrator is licensed under the Apache License 2.0.
 © 2026 **Ram Narayanan A S**. Open for contributions.
