@@ -62,10 +62,12 @@
   
     
     
+      
     
     
     
-    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="light-green" data-md-color-accent="teal">
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="light-green" data-md-color-accent="light-green">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -116,7 +118,33 @@
     </div>
     
       
+        <form class="md-header__option" data-md-component="palette">
+  
     
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="light-green" data-md-color-accent="light-green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
     
     
     
@@ -496,6 +524,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="3. Configure the Runtime (titan.properties)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#acreate-titanproperties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.Create titan.properties:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-start-titanstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. Start TitanStore
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -583,6 +639,8 @@
     
     
       
+      
+        
       
     
     
@@ -725,6 +783,8 @@
     
       
       
+        
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -865,6 +925,8 @@
     
     
       
+      
+        
       
     
     
@@ -1096,6 +1158,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="3. Configure the Runtime (titan.properties)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#acreate-titanproperties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.Create titan.properties:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-start-titanstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. Start TitanStore
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -1212,7 +1302,7 @@
 </span></code></pre></div>
 <h3 id="3-configure-the-runtime-titanproperties">3. Configure the Runtime (titan.properties)</h3>
 <p>Titan uses an Adapter Pattern for its state management, meaning the persistence layer is entirely pluggable. To connect the Master to your Redis (TitanStore) instance for state recovery and data-bus features, create a titan.properties file in the root directory where you run the JAR.</p>
-<p>Create <code>titan.properties</code>:</p>
+<h4 id="acreate-titanproperties">A.Create <code>titan.properties</code>:</h4>
 <p>Properties
 <div class="language-properties highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># TitanStore (Redis) Connection</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="na">titan.redis.host</span><span class="o">=</span><span class="s">localhost</span>
@@ -1225,34 +1315,103 @@
 <blockquote>
 <p>Note: If this file is missing, Titan will gracefully degrade to sensible defaults (purely in-memory execution with no persistence or recovery) or attempt to connect to Redis on localhost:6379.</p>
 </blockquote>
+<h4 id="b-start-titanstore">B. Start TitanStore</h4>
+<p>Open a terminal and launch the persistence engine. It comes pre-bundled in the perm_files directory.</p>
+<p><div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>java<span class="w"> </span>-jar<span class="w"> </span>perm_files/TitanStore.jar
+</span></code></pre></div>
+<strong>Expected Output Logs</strong>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>STARTING<span class="w"> </span>as<span class="w"> </span>MASTER
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>&gt;&gt;&gt;<span class="w"> </span>AOF<span class="w"> </span>FILE<span class="w"> </span>IS<span class="w"> </span>HERE:<span class="w"> </span>&lt;PROJECT_DIR&gt;/database6379.aof
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>Recovering<span class="w"> </span>data...
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>Performing<span class="w"> </span>data<span class="w"> </span>recovery<span class="w"> </span>with<span class="w"> </span>aof<span class="w"> </span>file
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>DEBUG<span class="w"> </span>STORAGE:<span class="w"> </span>Putting<span class="w"> </span>k1<span class="w"> </span>with<span class="w"> </span>ttl<span class="w"> </span>-1
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>DEBUG<span class="w"> </span>MATH:<span class="w"> </span>No<span class="w"> </span>Expiry<span class="w"> </span><span class="nb">set</span><span class="w"> </span><span class="o">(</span>-1<span class="o">)</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>.......
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>Received:<span class="w"> </span><span class="o">[</span>SMEMBERS,<span class="w"> </span>system:active_jobs<span class="o">]</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>Received:<span class="w"> </span><span class="o">[</span>SADD,<span class="w"> </span>system:live_workers,<span class="w"> </span><span class="m">127</span>.0.0.1:8080<span class="o">]</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>Received:<span class="w"> </span><span class="o">[</span>SET,<span class="w"> </span>worker:127.0.0.1:8080:load,<span class="w"> </span><span class="m">0</span><span class="o">]</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>DEBUG<span class="w"> </span>STORAGE:<span class="w"> </span>Putting<span class="w"> </span>worker:127.0.0.1:8080:load<span class="w"> </span>with<span class="w"> </span>ttl<span class="w"> </span>-1
+</span></code></pre></div>
 <h2 id="start-the-cluster">Start the Cluster</h2>
 <h3 id="5-start-titanmaster-and-titanworker">5. Start TitanMaster and TitanWorker</h3>
 <p><strong>Terminal 1 (The Master Scheduler):</strong>
 This starts the control plane on default port <code>9090</code>. It will listen for worker heartbeats and incoming DAG submissions.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>java<span class="w"> </span>-cp<span class="w"> </span>target/titan-orchestrator-1.0-SNAPSHOT.jar<span class="w"> </span>titan.TitanMaster
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>java<span class="w"> </span>-cp<span class="w"> </span>target/titan-orchestrator-1.0-SNAPSHOT.jar<span class="w"> </span>titan.TitanMaster
+</span></code></pre></div>
+<p><strong>Expected Output Logs</strong></p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Clock<span class="w"> </span>Watcher<span class="w"> </span>Started...
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>Scheduler<span class="w"> </span>Core<span class="w"> </span>starting<span class="w"> </span>at<span class="w"> </span>port<span class="w"> </span><span class="m">9090</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="o">[</span>INFO<span class="o">][</span>SUCCESS<span class="o">]</span><span class="w"> </span>Connected<span class="w"> </span>to<span class="w"> </span>Redis<span class="w"> </span><span class="k">for</span><span class="w"> </span>Persistence.
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="o">[</span>INFO<span class="o">]</span><span class="w"> </span>Redis<span class="w"> </span>Persistence<span class="w"> </span>Layer<span class="w"> </span>Active
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="o">[</span>INFO<span class="o">][</span>RECOVERY<span class="o">]</span><span class="w"> </span>Scanning<span class="w"> </span><span class="k">for</span><span class="w"> </span>orphaned<span class="w"> </span>jobs...
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="o">[</span>INFO<span class="o">][</span>RECOVERY<span class="o">]</span><span class="w"> </span>No<span class="w"> </span>stranded<span class="w"> </span><span class="nb">jobs</span><span class="w"> </span>found.
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="o">[</span>OK<span class="o">]</span><span class="w"> </span>SchedulerServer<span class="w"> </span>Listening<span class="w"> </span>on<span class="w"> </span>port<span class="w"> </span><span class="m">9090</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="o">[</span>INFO<span class="o">]</span><span class="w"> </span>Titan<span class="w"> </span>Auto-Scaler<span class="w"> </span>active.
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>Running<span class="w"> </span>Dispatch<span class="w"> </span>Loop
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>Incoming<span class="w"> </span>connection<span class="w"> </span>from<span class="w"> </span>/127.0.0.1<span class="w"> </span>Port53797
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>Registering<span class="w"> </span>Worker:<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span>with<span class="w"> </span>GENERAL
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="o">[</span>INFO<span class="o">]</span><span class="w"> </span>New<span class="w"> </span>Worker<span class="w"> </span>Registered:<span class="w"> </span><span class="m">127</span>.0.0.1:8080<span class="w"> </span><span class="o">[</span>EPHEMERAL<span class="o">]</span>
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="o">[</span>TitanProto<span class="o">]</span><span class="w"> </span>Sent<span class="w"> </span>Op:80<span class="w"> </span>Len:10
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>Sending<span class="w"> </span>Heartbeat
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="o">[</span>TitanProto<span class="o">]</span><span class="w"> </span>Sent<span class="w"> </span>Op:1<span class="w"> </span>Len:0
+</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>Sending<span class="w"> </span>Heartbeat
+</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="o">[</span>TitanProto<span class="o">]</span><span class="w"> </span>Sent<span class="w"> </span>Op:1<span class="w"> </span>Len:0
+</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a><span class="o">[</span>SCALER<span class="o">]</span><span class="w"> </span>Cluster<span class="w"> </span>Pressure:<span class="w"> </span><span class="m">0</span>/4
+</span><span id="__span-7-19"><a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>Sending<span class="w"> </span>Heartbeat
+</span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>....
 </span></code></pre></div>
 <p><strong>Terminal 2 (The Default Worker Node):</strong>
 This starts a general-purpose hardware node. By default, it connects to the local Master on port <code>9090</code> and opens itself for task execution on port <code>8080</code>.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>java<span class="w"> </span>-cp<span class="w"> </span>target/titan-orchestrator-1.0-SNAPSHOT.jar<span class="w"> </span>titan.TitanWorker
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>java<span class="w"> </span>-cp<span class="w"> </span>target/titan-orchestrator-1.0-SNAPSHOT.jar<span class="w"> </span>titan.TitanWorker
+</span></code></pre></div>
+<p><strong>Expected Output Logs</strong></p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="w">   </span>**<span class="w"> </span>Starting<span class="w"> </span>Titan<span class="w"> </span>Worker<span class="w"> </span>Node**
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">   </span>Local<span class="w"> </span>Port:<span class="w">  </span><span class="m">8080</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">   </span>Master:<span class="w">      </span>localhost:9090
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">   </span>Capability:<span class="w">  </span>GENERAL
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">   </span>Mode:<span class="w">        </span>EPHEMERAL<span class="w"> </span><span class="o">(</span>Auto-Scaleable<span class="o">)</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>DEBUG:<span class="w"> </span>Attempting<span class="w"> </span>to<span class="w"> </span><span class="nb">bind</span><span class="w"> </span>to<span class="w"> </span>port:<span class="w"> </span><span class="m">8080</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>----<span class="w"> </span>Worker<span class="w"> </span>Startup<span class="w"> </span>Check<span class="w"> </span>----
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="o">[</span>INFO<span class="o">]</span><span class="w"> </span><span class="o">[</span>ZOMBIE<span class="w"> </span>KILLER<span class="o">]</span><span class="w"> </span>Checking<span class="w"> </span><span class="k">for</span><span class="w"> </span>leftover<span class="w"> </span>processes...
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>Worker<span class="w"> </span>Server<span class="w"> </span>started<span class="w"> </span>on<span class="w"> </span>port<span class="w"> </span><span class="m">8080</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="o">[</span>TitanProto<span class="o">]</span><span class="w"> </span>Sent<span class="w"> </span>Op:2<span class="w"> </span>Len:20
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="o">[</span>OK<span class="o">]</span><span class="w"> </span>Successfully<span class="w"> </span>registered<span class="w"> </span>with<span class="w"> </span>Scheduler!
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="o">[</span>TitanProto<span class="o">]</span><span class="w"> </span>Sent<span class="w"> </span>Op:80<span class="w"> </span>Len:8
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="o">[</span>TitanProto<span class="o">]</span><span class="w"> </span>Sent<span class="w"> </span>Op:80<span class="w"> </span>Len:8
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="o">[</span>TitanProto<span class="o">]</span><span class="w"> </span>Sent<span class="w"> </span>Op:80<span class="w"> </span>Len:8
 </span></code></pre></div>
 <p><em>(You should immediately see a "Worker Registered" log appear in Terminal 1).</em></p>
 <blockquote>
 <p><strong>⚡ Advanced Worker Configurations</strong>
 You can easily spawn specialized nodes by passing arguments: <code>[Port] [MasterIP] [MasterPort] [Capability] [isPermanent]</code></p>
 <p><em>Example: Spawn a persistent GPU worker on port 8081:</em>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>java<span class="w"> </span>-cp<span class="w"> </span>target/titan-orchestrator-1.0-SNAPSHOT.jar<span class="w"> </span>titan.TitanWorker<span class="w"> </span><span class="m">8081</span><span class="w"> </span>localhost<span class="w"> </span><span class="m">9090</span><span class="w"> </span>GPU<span class="w"> </span><span class="nb">true</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>java<span class="w"> </span>-cp<span class="w"> </span>target/titan-orchestrator-1.0-SNAPSHOT.jar<span class="w"> </span>titan.TitanWorker<span class="w"> </span><span class="m">8081</span><span class="w"> </span>localhost<span class="w"> </span><span class="m">9090</span><span class="w"> </span>GPU<span class="w"> </span><span class="nb">true</span>
 </span></code></pre></div></p>
 </blockquote>
+<p><strong>Expected Output:</strong></p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>**<span class="w"> </span>Starting<span class="w"> </span>Titan<span class="w"> </span>Worker<span class="w"> </span>Node**
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">   </span>Local<span class="w"> </span>Port:<span class="w">  </span><span class="m">8081</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">   </span>Master:<span class="w">      </span>localhost:9090
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">   </span>Capability:<span class="w">  </span>GPU
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">   </span>Mode:<span class="w">        </span>PERMANENT<span class="w"> </span><span class="o">(</span>Protected<span class="o">)</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>DEBUG:<span class="w"> </span>Attempting<span class="w"> </span>to<span class="w"> </span><span class="nb">bind</span><span class="w"> </span>to<span class="w"> </span>port:<span class="w"> </span><span class="m">8081</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>----<span class="w"> </span>Worker<span class="w"> </span>Startup<span class="w"> </span>Check<span class="w"> </span>----
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="o">[</span>INFO<span class="o">]</span><span class="w"> </span><span class="o">[</span>ZOMBIE<span class="w"> </span>KILLER<span class="o">]</span><span class="w"> </span>Checking<span class="w"> </span><span class="k">for</span><span class="w"> </span>leftover<span class="w"> </span>processes...
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>Worker<span class="w"> </span>Server<span class="w"> </span>started<span class="w"> </span>on<span class="w"> </span>port<span class="w"> </span><span class="m">8081</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="o">[</span>TitanProto<span class="o">]</span><span class="w"> </span>Sent<span class="w"> </span>Op:2<span class="w"> </span>Len:15
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="o">[</span>OK<span class="o">]</span><span class="w"> </span>Successfully<span class="w"> </span>registered<span class="w"> </span>with<span class="w"> </span>Scheduler!
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="o">[</span>TitanProto<span class="o">]</span><span class="w"> </span>Sent<span class="w"> </span>Op:80<span class="w"> </span>Len:8
+</span></code></pre></div>
 <hr />
 <h3 id="5-install-the-python-sdk">5. Install the Python SDK</h3>
 <p>The Titan Python SDK allows you to submit jobs, define DAGs, and interact with the cluster programmatically.</p>
 <p>Open a third terminal window and install the SDK in editable mode:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
 </span></code></pre></div>
 <hr />
 <h3 id="6-run-your-first-task">6. Run Your First Task</h3>
 <p>Let's deploy a pre-configured YAML DAG to the cluster using the Titan CLI.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>python<span class="w"> </span>titan_sdk/titan_cli.py<span class="w"> </span>deploy<span class="w"> </span>titan_test_suite/examples/yaml_based_static_tests/dag_structure_test
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>python<span class="w"> </span>titan_sdk/titan_cli.py<span class="w"> </span>deploy<span class="w"> </span>titan_test_suite/examples/yaml_based_static_tests/dag_structure_test
 </span></code></pre></div>
 <p><strong>What just happened?</strong></p>
 <ol>
@@ -1264,9 +1423,12 @@ You can easily spawn specialized nodes by passing arguments: <code>[Port] [Maste
 <hr />
 <h3 id="7-open-the-dashboard-optional">7. Open the Dashboard (Optional)</h3>
 <p>Titan includes a lightweight Flask dashboard to visualize cluster health and stream live logs. To spin it up, run:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>python3<span class="w"> </span>./perm_files/server_dashboard.py
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>python3<span class="w"> </span>./perm_files/server_dashboard.py
 </span></code></pre></div>
 <p>Navigate to <strong><code>http://localhost:5000</code></strong> in your browser to see your Worker node's live CPU/Thread load and the history of the DAG you just ran.</p>
+<blockquote>
+<p>This is an external dependency and you will need to install Flask alone for this to work. This is not part of the engine and is an extension so its an external dependency.</p>
+</blockquote>
 
 
 
@@ -1286,6 +1448,12 @@ You can easily spawn specialized nodes by passing arguments: <code>[Port] [Maste
           
 <script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
         </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
         
       </main>
       
@@ -1320,7 +1488,7 @@ You can easily spawn specialized nodes by passing arguments: <code>[Port] [Maste
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "content.code.copy", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
       <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
