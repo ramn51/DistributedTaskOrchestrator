@@ -265,7 +265,9 @@ public class RpcWorkerServer {
                         // add busy waiting for the OS to handle the exit
                         try { Thread.sleep(100); } catch (InterruptedException ignored) {}
                         // Kill the JVM
-                        System.exit(0);
+                        this.stop();
+//                        System.exit(0);
+                        break;
                     }
                 } catch (EOFException e) {
 //                    System.out.println("Scheduler disconnected.");

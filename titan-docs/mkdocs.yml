@@ -63,6 +63,7 @@ nav:
       - Titan SDK: reference/sdk.md
       - Java Engine API: javadocs/docs/index.html
       - Titan CLI: reference/cli.md
+      - Titan RPC Spec: reference/rpc-spec.md
 
   - 🧠 Architecture Deep Dive:
       - System Design: architecture/design.md

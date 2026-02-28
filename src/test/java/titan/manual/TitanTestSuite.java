@@ -28,7 +28,7 @@ public class TitanTestSuite {
             CronAndPriorityTest.class,
             DeployCommandIntegrationTest.class,
             RunScriptTest.class,
-            test.java.titan.manual.WorkerScriptIntegrationTest.class,
+            test.java.titan.manual.WorkerScriptIntegrationRunner.class,
             FaultToleranceTest.class,
             WorkerLoadTest.class,
             LoadBalancerTest.class,

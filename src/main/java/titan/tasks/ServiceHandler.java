@@ -279,7 +279,8 @@ import java.util.concurrent.ConcurrentHashMap;
     private String stopProcess(String serviceId){
         Process p = runningServices.get(serviceId);
             if(p!=null){
-                p.destroy();
+                p.descendants().forEach(ProcessHandle::destroyForcibly);
+                p.destroyForcibly();
                 runningServices.remove(serviceId);
                 return "STOPPED: " + serviceId;
             } else{

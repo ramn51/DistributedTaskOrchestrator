@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.concurrent.CountDownLatch;
 
-public class WorkerScriptIntegrationTest {
+public class WorkerScriptIntegrationRunner {
 
     private static final int TEST_PORT = 8081; // Use a different port to avoid conflicts
     private static final int UDP_PORT = 9999;

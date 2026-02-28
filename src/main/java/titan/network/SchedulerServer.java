@@ -25,8 +25,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
-import java.util.Base64;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import titan.network.TitanProtocol.TitanPacket;
@@ -260,6 +259,52 @@ import titan.network.TitanProtocol.TitanPacket;
         }
     }
 
+    private boolean detectCycle(List<Job> dagJobs){
+        Map<String, List<String>> adjList = new HashMap<>();
+        Map<String, Integer> inDegrees = new HashMap<>();
+        Queue<String> queue = new ArrayDeque<>();
+
+        for(Job job: dagJobs){
+            adjList.putIfAbsent(job.getId(), new ArrayList<>());
+            inDegrees.putIfAbsent(job.getId(), 0);
+
+            for(String parentId : job.getDependenciesIds()){
+                if (!adjList.containsKey(parentId) && dagJobs.stream().noneMatch(j -> j.getId().equals(parentId))) {
+                    continue;
+                }
+
+                adjList.putIfAbsent(parentId, new ArrayList<>());
+                inDegrees.putIfAbsent(parentId, 0);
+
+                adjList.get(parentId).add(job.getId());
+                inDegrees.put(job.getId(), inDegrees.get(job.getId()) + 1);
+
+            }
+        }
+
+        for (Map.Entry<String, Integer> entry : inDegrees.entrySet()) {
+            if (entry.getValue() == 0) {
+                queue.offer(entry.getKey());
+            }
+        }
+
+        int processed = 0;
+
+        while(!queue.isEmpty()){
+            String curr = queue.poll();
+            processed ++;
+
+            for(String child : adjList.get(curr)){
+                inDegrees.put(child, inDegrees.get(child) - 1);
+                if (inDegrees.get(child) == 0) {
+                    queue.offer(child);
+                }
+            }
+        }
+
+        return processed != inDegrees.size();
+    }
+
     /**
  * Parses a string containing multiple job definitions for a Directed Acyclic Graph (DAG) and submits each job to the {@link titan.scheduler.Scheduler}.
  * Each job definition within the request string is expected to be separated by a semicolon ({@code ;}).
@@ -270,16 +315,27 @@ import titan.network.TitanProtocol.TitanPacket;
  */
     private void parseAndSubmitDAG(String request){
         String [] jobs = request.split(";");
+        List<Job> parsedDagJobs = new ArrayList<>();
         for(String jobDef: jobs){
             if(jobDef.trim().isEmpty()) continue;
             try {
                 Job job = Job.fromDagString(jobDef.trim());
-                System.out.println("[INFO] [PARSER] Created Job: " + job.getId());
-                scheduler.submitJob(job);
+                parsedDagJobs.add(job);
             } catch (Exception e) {
                 System.err.println("[FAIL] Failed to parse DAG job: " + jobDef + " Error: " + e.getMessage());
             }
         }
+
+        if(detectCycle(parsedDagJobs)){
+            System.err.println("[FATAL] Cycle detected in DAG! Rejecting entire payload to prevent deadlock.");
+            return;
+        }
+
+        for(Job job: parsedDagJobs){
+            System.out.println("[INFO] [PARSER] Created Job: " + job.getId());
+            scheduler.submitJob(job);
+        }
+
     }
 
 

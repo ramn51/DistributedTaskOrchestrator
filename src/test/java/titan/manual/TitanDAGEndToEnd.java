@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -48,24 +48,25 @@ public class TitanDAGEndToEnd {
         testSimpleAffinity();
         testComplexFanOutAffinity();
 
+        // NEW TEST: Cycle Detection
+        testCycleDetectionRejection();
+
         System.out.println("\n=== ALL VALIDATIONS COMPLETE ===");
         System.exit(0);
     }
 
     private static void testSimpleSequence() throws Exception {
         System.out.println("\n--- 1. Validating Simple Sequence (A -> B) ---");
-        // CHANGED: Use 'calc.py' instead of 'DataA'
         sendDag("S1_A|TEST|calc.py|2|0|[] ; S1_B|TEST|calc.py|1|0|[S1_A]");
 
         Thread.sleep(4000);
 
-        assertStatus("S1_A", Job.Status.COMPLETED);
-        assertStatus("S1_B", Job.Status.COMPLETED);
+        assertStatus("DAG-S1_A", Job.Status.COMPLETED);
+        assertStatus("DAG-S1_B", Job.Status.COMPLETED);
     }
 
     private static void testDiamondDag() throws Exception {
         System.out.println("\n--- 2. Validating Diamond DAG ---");
-        // CHANGED: Use 'calc.py' for all nodes
         sendDag("D_ROOT|TEST|calc.py|2|0|[] ; " +
                 "D_LEFT|TEST|calc.py|1|0|[D_ROOT] ; " +
                 "D_RIGHT|TEST|calc.py|1|0|[D_ROOT] ; " +
@@ -73,29 +74,27 @@ public class TitanDAGEndToEnd {
 
         Thread.sleep(6000);
 
-        assertStatus("D_ROOT", Job.Status.COMPLETED);
-        assertStatus("D_LEFT", Job.Status.COMPLETED);
-        assertStatus("D_RIGHT", Job.Status.COMPLETED);
-        assertStatus("D_FINAL", Job.Status.COMPLETED);
+        assertStatus("DAG-D_ROOT", Job.Status.COMPLETED);
+        assertStatus("DAG-D_LEFT", Job.Status.COMPLETED);
+        assertStatus("DAG-D_RIGHT", Job.Status.COMPLETED);
+        assertStatus("DAG-D_FINAL", Job.Status.COMPLETED);
     }
 
     private static void testCascadingFailure() throws Exception {
         System.out.println("\n--- 3. Validating Cascading Failure ---");
-        // KEEP 'FAIL_THIS' because we WANT it to fail!
         sendDag("F_PARENT|TEST|FAIL_THIS|2|0|[] ; " +
                 "F_CHILD|TEST|calc.py|1|0|[F_PARENT] ; " +
                 "F_GRAND|TEST|calc.py|1|0|[F_CHILD]");
 
         Thread.sleep(12000); // Retries take time
 
-        assertStatus("F_PARENT", Job.Status.DEAD);
-        assertStatus("F_CHILD", Job.Status.DEAD);
-        assertStatus("F_GRAND", Job.Status.DEAD);
+        assertStatus("DAG-F_PARENT", Job.Status.DEAD);
+        assertStatus("DAG-F_CHILD", Job.Status.DEAD);
+        assertStatus("DAG-F_GRAND", Job.Status.DEAD);
     }
 
     private static void testSimpleAffinity() throws Exception {
         System.out.println("\n--- 4. Validating Simple Affinity (Parent -> Child) ---");
-        // CHANGED: Use 'calc.py'
         String dag = "AFF_PARENT|TEST|calc.py|2|0|[] ; " +
                 "AFF_CHILD|TEST|calc.py|1|0|[AFF_PARENT]|AFFINITY";
 
@@ -103,14 +102,13 @@ public class TitanDAGEndToEnd {
 
         Thread.sleep(5000);
 
-        assertStatus("AFF_PARENT", Job.Status.COMPLETED);
-        assertStatus("AFF_CHILD", Job.Status.COMPLETED);
-        assertAffinity("AFF_PARENT", "AFF_CHILD");
+        assertStatus("DAG-AFF_PARENT", Job.Status.COMPLETED);
+        assertStatus("DAG-AFF_CHILD", Job.Status.COMPLETED);
+        assertAffinity("DAG-AFF_PARENT", "DAG-AFF_CHILD");
     }
 
     private static void testComplexFanOutAffinity() throws Exception {
         System.out.println("\n--- 5. Validating Complex Fan-Out Affinity ---");
-        // CHANGED: Use 'calc.py'
         String dag =
                 "ML_TRAIN|TEST|calc.py|5|0|[] ; " +
                         "ML_EVAL_A|TEST|calc.py|1|0|[ML_TRAIN]|AFFINITY ; " +
@@ -120,12 +118,41 @@ public class TitanDAGEndToEnd {
 
         Thread.sleep(6000);
 
-        assertStatus("ML_TRAIN", Job.Status.COMPLETED);
-        assertStatus("ML_EVAL_A", Job.Status.COMPLETED);
-        assertStatus("ML_EVAL_B", Job.Status.COMPLETED);
+        assertStatus("DAG-ML_TRAIN", Job.Status.COMPLETED);
+        assertStatus("DAG-ML_EVAL_A", Job.Status.COMPLETED);
+        assertStatus("DAG-ML_EVAL_B", Job.Status.COMPLETED);
 
-        assertAffinity("ML_TRAIN", "ML_EVAL_A");
-        assertAffinity("ML_TRAIN", "ML_EVAL_B");
+        assertAffinity("DAG-ML_TRAIN", "DAG-ML_EVAL_A");
+        assertAffinity("DAG-ML_TRAIN", "DAG-ML_EVAL_B");
+    }
+
+    /**
+     * NEW TEST: Validates Kahn's Algorithm implementation in SchedulerServer.
+     * Submits a DAG with a 3-node cycle (A -> B -> C -> A) and asserts
+     * that the Scheduler safely aborts the payload without polluting memory.
+     */
+    private static void testCycleDetectionRejection() throws Exception {
+        System.out.println("\n--- 6. Validating Pre-Flight Cycle Detection (Kahn's Algorithm) ---");
+
+        // C depends on B, B depends on A, A depends on C. (Deadlock)
+        String cyclicDag = "CYC_A|TEST|calc.py|1|0|[CYC_C] ; " +
+                "CYC_B|TEST|calc.py|1|0|[CYC_A] ; " +
+                "CYC_C|TEST|calc.py|1|0|[CYC_B]";
+
+        sendDag(cyclicDag);
+
+        // Give the SchedulerServer a moment to parse and reject it
+        Thread.sleep(1500);
+
+        // If Kahn's algorithm works, the Master refuses to instantiate these jobs.
+        // Therefore, the dagWaitingRoom should NOT contain them.
+        boolean isSafelyRejected = !scheduler.getDAGWaitingRoom().containsKey("DAG-CYC_A");
+
+        if (isSafelyRejected) {
+            System.out.println("[OK] [PASS] Cyclic DAG was successfully detected and rejected.");
+        } else {
+            System.err.println("[FAIL] [FAIL] Cyclic DAG bypassed Kahn's Algorithm and polluted the waiting room!");
+        }
     }
 
     // --- HELPERS (Keep exactly the same) ---
