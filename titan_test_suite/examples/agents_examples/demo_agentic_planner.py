@@ -82,9 +82,9 @@ def ask_llm(history, user_goal):
 
     print("🧠 Contacting OpenAI...")
     completion = client.chat.completions.create(
-        model="gpt-4-turbo", # Or gpt-3.5-turbo
+        model="gpt-4-turbo",
         messages=messages,
-        temperature=0.0 # Strict logic
+        temperature=0.0
     )
     
     raw_content = completion.choices[0].message.content
@@ -139,7 +139,7 @@ def run_titan_agent(user_goal):
         
         # 4. OBSERVE
         print("⏳ Waiting for Cluster execution...")
-        time.sleep(5) # Give Titan time to process
+        time.sleep(5)
         
         logs_accumulated = ""
         for tid in track_ids:

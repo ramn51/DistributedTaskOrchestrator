@@ -4,7 +4,7 @@ Titan achieves its zero-dependency architecture by implementing its own network 
 
 ---
 
-## 1. The Wire Protocol (`TITAN_PROTO`)
+## 1. The Titan Protocol (`TITAN_PROTO`)
 
 Titan does not rely on HTTP/REST or heavy gRPC layers for internal orchestration. To maximize performance and minimize the memory footprint of the core engine, node-to-node communication happens over simple TCP sockets using a custom binary protocol.
 

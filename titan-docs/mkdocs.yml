@@ -36,6 +36,7 @@ theme:
 #     - navigation.tabs # Puts top-level items in a top navbar
 
 markdown_extensions:
+  - admonition
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
@@ -46,6 +47,8 @@ markdown_extensions:
   - attr_list
   - md_in_html
   - pymdownx.blocks.caption
+  - pymdownx.tasklist:
+      custom_checkbox: false
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid

@@ -102,21 +102,25 @@ job_id = "flaky_training_run"
 # 1. Fetch remote execution logs via Titan's protocol
 logs = client.fetch_logs(job_id)
 
-# 2. AI/Logic Evaluation
-if "Segfault" in logs or "OutOfMemory" in logs:
-    print(f"[ERROR] CRITICAL ERROR in {job_id}. Agent is deploying a patch...")
-    
-    # Programmatically create a new job to fix the issue
+# 2. AI Evaluation: An LLM Agent analyzes the physical execution logs
+decision = llm_agent.analyze_failure(logs)
+
+# 3. Act on the LLM's dynamic decision
+if decision.action == "DEPLOY_PATCH":
+    print(f"[AGENT] Root cause: {decision.reason}. Deploying patch...")
+
+    # Programmatically create a remediation job on the fly
     fix_job = TitanJob(
         job_id=f"{job_id}_fix", 
         filename="scripts/safe_mode_patch.py",
-        requirement="GENERAL"
+        # The agent dynamically requests specific capabilities based on the failure!
+        requirement=decision.recommended_hardware # e.g., "HIGH_MEMORY"
     )
-    
-    # Dispatch the new task to the cluster
+
+    # 4. Dispatch the new task to the cluster
     client.submit_job(fix_job)
 else:
-    print("[SUCCESS] Run healthy. Agent sequence complete.")
+    print("[AGENT] Run healthy or failure is non-critical. Sequence complete.")
 ```
 
 ## 4. Stateful Agents (Using TitanStore for Memory)

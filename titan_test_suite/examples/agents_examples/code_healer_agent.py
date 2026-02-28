@@ -85,7 +85,7 @@ def run_healer(target_file):
                 job_id = f"DAG-HEALER-CYCLE-{i}-{j['file'][:4]}",
                 filename=j['file'],
                 job_type="RUN_PAYLOAD",
-                args=j.get('args', "") # <--- Uses your new Args feature!
+                args=j.get('args', "")
             )
             jobs.append(job)
 

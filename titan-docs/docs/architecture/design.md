@@ -87,7 +87,7 @@ This ensures lightning-fast IPC (Inter-Process Communication) with very less lat
 
 ## 2. Internal Mechanics: 
 
-The Master NodeThe Master acts as the Scheduler and Control Plane. It utilizes specialized threads to manage the cluster efficiently.
+The Master Node: The Master acts as the Scheduler and Control Plane. It utilizes specialized threads to manage the cluster efficiently.
 
 - **Inverted Worker Registration (Push-Based Discovery)**
 
@@ -189,18 +189,16 @@ Titan is a research runtime designed to explore the **primitives of orchestratio
 
     * The current implementation uses raw, unencrypted TCP sockets.
     * *Constraint:* Do not run Titan on public networks (WAN) without a VPN or SSH Tunnel. Use strictly within a trusted VPC/LAN.
-2. **State Loss (Solved in v1.5):** 
 
-* The Master node now utilizes TitanStore (RedisJava) for state persistence. If the Master process dies, the cluster state is fully recovered from the AOF upon restart.
-3. **Process Failover:**
+2. **Process Failover:**
 
     * While data is safe, the Master is currently a singleton process. If it crashes, workers cannot receive new instructions until it reboots. High Availability (HA) via Raft Consensus (Leader Election) is planned for the v2.0 Roadmap to achieve true zero-downtime failover.
 
-4. **Network Topology:**
+3. **Network Topology:**
 
     * Titan assumes a flat address space (all nodes can ping each other via IP). It does not currently handle NAT Traversal or complex Subnet routing.
 
-5. **Scaling Boundary (Process vs. Infrastructure):**
+4. **Scaling Boundary (Process vs. Infrastructure):**
 
     * Titan implements **Application-Level Scaling** (spawning new JVM worker processes on existing hardware).
     * **Infrastructure Provisioning** is currently delegated to external tools.

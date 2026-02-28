@@ -14,11 +14,11 @@ def seed_and_dispatch():
     client = TitanClient()
     batch_jobs = []
 
-    print(f"📤 Uploading execution logic to cluster: {WORKER_SCRIPT_NAME}")
+    print(f"Uploading execution logic to cluster: {WORKER_SCRIPT_NAME}")
     if os.path.exists(WORKER_SCRIPT_PATH):
         client.upload_file(WORKER_SCRIPT_PATH)
     else:
-        print(f"❌ Could not find {WORKER_SCRIPT_PATH}. Exiting.")
+        print(f"Could not find {WORKER_SCRIPT_PATH}. Exiting.")
         return
 
     for target_dir in TARGET_DIRS:
@@ -49,9 +49,9 @@ def seed_and_dispatch():
 
     if batch_jobs:
         client.submit_dag("AUTO_DOC_ENGINE", batch_jobs)
-        print(f"✅ Seeding complete. {len(batch_jobs)} files dispatched for documentation.")
+        print(f"Seeding complete. {len(batch_jobs)} files dispatched for documentation.")
     else:
-        print("⚠️ No valid files found to document.")
+        print("No valid files found to document.")
 
 if __name__ == "__main__":
     seed_and_dispatch()
