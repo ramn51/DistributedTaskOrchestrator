@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="screenshots/logo.png" alt="Titan Orchestrator Logo" width="350">
+  <img src="screenshots/Titan_logo.png" alt="Titan Orchestrator Logo" width="350">
 </p>
 
 # Titan Orchestrator

@@ -104,17 +104,17 @@ def run_healer(target_file):
     titan = TitanClient()
     history = []
     
-    print(f"🚑 HEALER DISPATCHED for: {target_file}")
+    print(f"HEALER DISPATCHED for: {target_file}")
     
     for i in range(3): # Max 5 attempts to fix
         print(f"\n--- Cycle {i+1} ---")
         
         # 1. Ask the Doctor what to do
         plan = ask_doctor(history, f"The file {target_file} is broken. Fix it.", i, max_retries=3)
-        print(f"💊 Prescription: {plan.get('comment')}")
+        print(f"Prescription: {plan.get('comment')}")
         
         if plan['action'] == "FINISH":
-            print("✅ PATIENT CURED! Exiting.")
+            print("PATIENT CURED! Exiting.")
             return
 
         # 2. Execute the treatment
@@ -127,7 +127,7 @@ def run_healer(target_file):
                 job_id=job_id_local,
                 filename=j['file'],
                 job_type="RUN_PAYLOAD",
-                args=j.get('args', "") # <--- Uses your new Args feature!
+                args=j.get('args', "") 
             )
             jobs.append(job)
 
@@ -138,7 +138,7 @@ def run_healer(target_file):
         cycle_log = ""
         for j in jobs:
             log = titan.fetch_logs(j.id)
-            print(f"   📋 Result: {log.strip()[:100]}...")
+            print(f" Result: {log.strip()[:100]}...")
             cycle_log += f"Job {j.filename} Result:\n{log}\n"
         
         history.append(cycle_log)
