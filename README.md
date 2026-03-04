@@ -7,6 +7,12 @@
 
 Titan is a zero-dependency distributed runtime built from first principles to solve the **"Physical Execution"** problem. It bridges the gap between static orchestrators (Airflow), dynamic AI agents, and long-running micro-services.
 
+## Built-In Dashboard
+Titan includes a lightweight Python Flask dashboard to visualize cluster health, monitor worker load, and stream stdout/stderr from distributed jobs in real-time.
+
+![Titan Dashboard](screenshots/UI_Screenshot.png)
+![Log Streaming](screenshots/Log_Stream.png)
+
 **What can Titan run?**
 
 **Static Pipelines:** Deterministic ETL and DevOps workflows.

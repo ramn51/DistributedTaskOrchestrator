@@ -4,7 +4,7 @@
 
 # Titan Orchestrator
 
-![Status: Experimental](https://img.shields.io/badge/Status-Experimental_Research-blue) ![Built by: 1 Developer](https://img.shields.io/badge/Solo_Project-Ram_Narayanan-brightgreen)
+[![GitHub Repo](https://img.shields.io/badge/GitHub-View_Repository-181717?logo=github)](https://github.com/ramn51/titan-orchestrator) ![Status: Experimental](https://img.shields.io/badge/Status-Experimental_Research-blue) ![Built by: 1 Developer](https://img.shields.io/badge/Solo_Project-Ram_Narayanan-brightgreen)
 
 
 **Titan is a lightweight distributed execution runtime with execution control as a first-class concern.**

@@ -38,6 +38,13 @@ jobs:
 
 ```
 
+```mermaid
+flowchart LR
+    A[root: init.py] --> B[left: processor.py]
+    A --> C[right: processor.py]
+    B --> D[sink: init.py]
+    C --> D
+```
 ### Deploying the Pipeline
 Use the Titan CLI to submit this DAG to your cluster:
 
@@ -45,7 +52,7 @@ Use the Titan CLI to submit this DAG to your cluster:
 python titan_sdk/titan_cli.py deploy diamond-flow.yaml
 ```
 
-## How Titan Handles This:
+### How Titan Handles This:
 
 1. Root is queued immediately.
 
@@ -53,7 +60,126 @@ python titan_sdk/titan_cli.py deploy diamond-flow.yaml
 
 3. Sink waits until both parallel tasks finish successfully before executing
 
-## 2. Advanced: Hardware-Aware Routing
+## 2. Parallel Processing: The Fan-Out Pattern
+
+*Best for: Data chunking, parallel web scraping, or triggering multiple independent jobs from a single event.*
+
+When you need to process massive amounts of data quickly, you can use the "Fan-Out" pattern. A single root task acts as a trigger, which then simultaneously unblocks multiple independent worker tasks. Titan will instantly distribute these workers across your cluster to process everything in parallel.
+
+Create a file named `fanout-test.yaml`:
+
+```yaml
+name: "fanout-test"
+version: "1.0"
+project: true
+
+jobs:
+  - id: "trigger"
+    type: "run"
+    file: "scripts/init.py"
+    args: "GO"
+
+  - id: "worker-1"
+    type: "run"
+    file: "src/processor.py"
+    args: "DATA_PART_1"
+    depends_on: ["trigger"]
+
+  - id: "worker-2"
+    type: "run"
+    file: "src/processor.py"
+    args: "DATA_PART_2"
+    depends_on: ["trigger"]
+
+  - id: "worker-3"
+    type: "run"
+    file: "src/processor.py"
+    args: "DATA_PART_3"
+    depends_on: ["trigger"]
+
+  - id: "worker-4"
+    type: "run"
+    file: "src/processor.py"
+    args: "DATA_PART_4"
+    depends_on: ["trigger"]
+```
+
+### Deploying the Pipeline
+Use the Titan CLI to submit this DAG to your cluster:
+```bash
+python titan_sdk/titan_cli.py deploy fanout-test.yaml
+```
+
+```mermaid
+flowchart LR
+    T(("trigger<br>init.py 'GO'"))
+
+    W1["worker-1<br>args: DATA_PART_1"]
+    W2["worker-2<br>args: DATA_PART_2"]
+    W3["worker-3<br>args: DATA_PART_3"]
+    W4["worker-4<br>args: DATA_PART_4"]
+
+    T --> W1
+    T --> W2
+    T --> W3
+    T --> W4
+
+    style T fill:#1e293b,stroke:#f9a826,stroke-width:2px,color:#ffffff
+```
+
+
+### How Titan handles this:
+**The Trigger:** The trigger task is queued immediately and executed on a single worker node.
+
+**The Fan-Out Event:** Once trigger completes successfully, Titan evaluates the DAG and detects that four separate tasks are suddenly unblocked.
+
+**Parallel Dispatch:** Titan's Master node immediately pushes all four worker tasks into the scheduling queue and distributes them across the cluster. If you have four idle nodes, they will all execute simultaneously.
+
+
+### 2.1 Adding a Reducer (Fan-In)
+To turn this into a full MapReduce pipeline, simply add one final "sink" node that depends on all of your parallel workers. Titan's scheduler will automatically hold this reducer task in the queue until every single worker has successfully finished.
+```yaml
+# Retain the Fan out YAML and add this
+- id: "reducer"
+    type: "run"
+    file: "src/reducer.py"
+    args: "AGGREGATE_ALL"
+    depends_on: ["worker-1", "worker-2", "worker-3", "worker-4"]
+```
+
+```mermaid
+flowchart LR
+    T(("trigger<br>init.py 'GO'"))
+
+    W1["worker-1<br>args: DATA_PART_1"]
+    W2["worker-2<br>args: DATA_PART_2"]
+    W3["worker-3<br>args: DATA_PART_3"]
+    W4["worker-4<br>args: DATA_PART_4"]
+    
+    R(("reducer<br>reducer.py 'AGGREGATE'"))
+
+    T --> W1
+    T --> W2
+    T --> W3
+    T --> W4
+    
+    W1 --> R
+    W2 --> R
+    W3 --> R
+    W4 --> R
+
+    style T fill:#1e293b,stroke:#f9a826,stroke-width:2px,color:#ffffff
+    style R fill:#1e293b,stroke:#1de9b6,stroke-width:2px,color:#ffffff
+```
+
+### How Titan handles this:
+
+1. **The Trigger:** The `trigger` task is queued immediately and executed.
+2. **The Map Phase (Fan-Out):** Once `trigger` completes, Titan detects multiple unblocked tasks and distributes them across the cluster to run in parallel.
+3. **The Reduce Phase (Fan-In):** The `reducer` task is blocked by its dependencies. The exact millisecond the final worker completes, the `reducer` task is unblocked and dispatched to aggregate the final data.
+
+
+## 3. Advanced: Hardware-Aware Routing
 When you have a heterogeneous cluster (e.g., some cheap CPU VMs and one expensive GPU machine), you can use the ``requirement`` tag to enforce strict node affinity.
 
 ```yaml
@@ -68,6 +194,13 @@ jobs:
     file: "scripts/train.py"
     depends_on: ["Data_Prep"]
     requirement: "GPU" # Titan guarantees this ONLY lands on a GPU-tagged node
+```
+
+```mermaid
+flowchart LR
+    A[Data_Prep: clean_data.py<br>⚙️ GENERAL] --> B[Train_Model: train.py<br> requirement: GPU]
+    
+    style B stroke:#bf360c,stroke-width:2px
 ```
 
 ### Deploying the Pipeline
@@ -139,6 +272,21 @@ jobs:
     depends_on: ["step-3-process"]
 
 ```
+
+```mermaid
+flowchart LR
+    S1[step-1-init<br> Priority: 10] -->|Delay: 2s| S2[step-2-fetch]
+    
+    subgraph Sticky Node Affinity
+        S2 -->|Affinity: True| S3[step-3-process]
+    end
+    
+    S3 --> S4((step-4-server<br> Service: Port 9000))
+
+    style S4 fill:#1e293b,stroke:#1de9b6,stroke-width:2px,color:#ffffff
+    style S1 fill:#1e293b,stroke:#f9a826,stroke-width:2px,color:#ffffff
+```
+
 
 ### Deploying the Pipeline
 Use the Titan CLI to submit your YAML DAG to the active cluster:

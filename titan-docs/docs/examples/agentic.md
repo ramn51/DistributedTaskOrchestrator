@@ -49,6 +49,13 @@ client.submit_dag("nightly_pipeline", [task_a, task_b])
 print("DAG Submitted Successfully!")
 ```
 
+```mermaid
+flowchart LR
+    A[extract_data: extract.py<br> Priority: 5] --> B[train_model: train.py<br> Requirement: GPU]
+    
+    style A fill:#1e293b,stroke:#f9a826,stroke-width:2px,color:#ffffff
+    style B fill:#1e293b,stroke:#bf360c,stroke-width:2px,color:#ffffff
+```
 
 ## 2. Dynamic Logic (Mode 1.5)
 _Best for_: __Conditional logic, real-time load balancing, and dynamic infrastructure.__
@@ -58,8 +65,6 @@ Because you are using pure Python, you can use standard if/else logic to decide 
 The "Logic Switch"
 In this scenario, our script checks the current traffic load. If traffic is high, it submits a single, lightweight task. If traffic is low, it dynamically generates a massive parallel "Deep Analysis" DAG.
 
-
-![Dynamic Logic Flow](../screenshots/Dynamic_decision_DAG.png)
 
 ```python
 from titan_sdk import TitanClient, TitanJob
@@ -79,6 +84,29 @@ else:
         for i in range(10)
     ]
     client.submit_dag("DEEP_PIPELINE", deep_tasks)
+```
+
+```mermaid
+flowchart LR
+    Traffic{"Traffic > 80?"}
+
+    %% The Fast Path
+    Traffic -->|Yes: High Traffic| Fast["fast_scan: fast_path.py<br>⚡ Fast"]
+
+    %% The Deep Path
+    Traffic -->|No: Normal Traffic| DAG["DEEP_PIPELINE<br>📦 submit_dag()"]
+    
+    %% The Fan-out of the Deep Path
+    DAG --> D0["deep_0"]
+    DAG --> D1["deep_1"]
+    DAG --> D9["... up to deep_9"]
+
+    style Traffic fill:#1e293b,stroke:#f9a826,stroke-width:2px,color:#ffffff
+    style Fast fill:#1e293b,stroke:#ef4444,stroke-width:2px,color:#ffffff
+    style DAG fill:#1e293b,stroke:#1de9b6,stroke-width:2px,color:#ffffff
+    style D0 fill:#1e293b,stroke:#64748b,stroke-width:2px,color:#ffffff
+    style D1 fill:#1e293b,stroke:#64748b,stroke-width:2px,color:#ffffff
+    style D9 fill:#1e293b,stroke:#64748b,stroke-width:2px,color:#ffffff
 ```
 
 ## 3. Agentic Workflows & LLMs (Mode 2)
@@ -121,6 +149,22 @@ if decision.action == "DEPLOY_PATCH":
     client.submit_job(fix_job)
 else:
     print("[AGENT] Run healthy or failure is non-critical. Sequence complete.")
+```
+
+```mermaid
+flowchart LR
+    Logs["fetch_logs('flaky_run')<br> Get Execution Logs"] --> LLM["llm_agent.analyze(logs)<br> AI Evaluation"]
+    
+    LLM --> Decision{"Action ==<br>'DEPLOY_PATCH'?"}
+
+    Decision -->|Yes: Root Cause Found| Patch["TitanJob(req='HIGH_MEMORY')<br> client.submit_job()"]
+    Decision -->|No: Non-Critical| Done["Run Healthy<br> Sequence Complete"]
+
+    style Logs fill:#1e293b,stroke:#64748b,stroke-width:2px,color:#ffffff
+    style LLM fill:#1e293b,stroke:#d946ef,stroke-width:2px,color:#ffffff
+    style Decision fill:#1e293b,stroke:#f9a826,stroke-width:2px,color:#ffffff
+    style Patch fill:#1e293b,stroke:#ef4444,stroke-width:2px,color:#ffffff
+    style Done fill:#1e293b,stroke:#1de9b6,stroke-width:2px,color:#ffffff
 ```
 
 ## 4. Stateful Agents (Using TitanStore for Memory)
@@ -167,6 +211,44 @@ else:
         filename="autonomous_agent.py"
     )
     client.submit_job(retry_job)
+```
+
+
+```mermaid
+flowchart LR
+    %% State Load
+    StateGet["1. agent_retry_count<br> client.store_get()"] --> DecisionRetry{"Attempt >= 3?"}
+    
+    %% Escalation Path
+    DecisionRetry -->|Yes: Halting| ResetEsc["client.store_put(0)<br>🧹 Reset State"]
+    ResetEsc --> Escalate["[ESCALATION]<br>Alert Human"]
+
+    %% Execution Path
+    DecisionRetry -->|No: Try Again| FragileTask{"2. fragile_api()<br> try/except"}
+    
+    %% Success Path
+    FragileTask -->|Success| ResetDone["client.store_put(0)<br> Reset State"]
+    ResetDone --> Terminate["[TERMINATE]<br>Sequence Done"]
+    
+    %% Failure Path
+    FragileTask -->|Failure| StatePut["3. Increment Count<br> client.store_put( Attempts + 1 )"]
+    
+    %% The Spawning Action
+    StatePut --> SubmitJob["4. submit_job()<br> Dynamic Spawn"]
+    
+    %% The Loop back
+    SubmitJob -.->|"New Clone Wakes Up"| StateGet
+
+    %% Dark-Mode Styling
+    style StateGet fill:#1e293b,stroke:#1de9b6,stroke-width:2px,color:#ffffff
+    style StatePut fill:#1e293b,stroke:#1de9b6,stroke-width:2px,color:#ffffff
+    style ResetEsc fill:#1e293b,stroke:#64748b,stroke-width:2px,color:#ffffff
+    style ResetDone fill:#1e293b,stroke:#64748b,stroke-width:2px,color:#ffffff
+    style DecisionRetry fill:#1e293b,stroke:#f9a826,stroke-width:2px,color:#ffffff
+    style FragileTask fill:#1e293b,stroke:#f9a826,stroke-width:2px,color:#ffffff
+    style Terminate fill:#1e293b,stroke:#22c55e,stroke-width:3px,color:#ffffff
+    style Escalate fill:#1e293b,stroke:#ef4444,stroke-width:3px,color:#ffffff
+    style SubmitJob fill:#1e293b,stroke:#bf360c,stroke-width:3px,color:#ffffff,stroke-dasharray: 5 5
 ```
 
 **Why this is powerful:**
