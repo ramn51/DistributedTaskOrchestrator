@@ -10,10 +10,11 @@ import socket
 import struct
 import json
 import time
+import base64
 import os
 import glob as _glob
 import re
-from flask import Flask, render_template_string, request, jsonify
+from flask import Flask, render_template_string, request, jsonify, send_from_directory
 
 app = Flask(__name__)
 
@@ -226,6 +227,7 @@ DASHBOARD_HTML = SHARED_STYLE + """
   <span class="topnav-brand">⚡ TITAN</span>
   <a class="tab active" href="/">🖥 Orchestrator</a>
   <a class="tab" href="/dags">🔀 DAG Pipelines</a>
+  <a class="tab" href="/dags/new">✏️ Constructor</a>
   <div class="topnav-right">
     <span class="conn-dot" style="background:{{ status_color }}"></span>
     <span style="color:{{ status_color }}; font-weight:600;">{{ status_text }}</span>
@@ -359,6 +361,7 @@ DAG_DASHBOARD_HTML = SHARED_STYLE + """
   <span class="topnav-brand">⚡ TITAN</span>
   <a class="tab" href="/">🖥 Orchestrator</a>
   <a class="tab active" href="/dags">🔀 DAG Pipelines</a>
+  <a class="tab" href="/dags/new">✏️ Constructor</a>
   <div class="topnav-right">
     <span class="conn-dot" style="background:{{ status_color }}"></span>
     <span style="color:{{ status_color }}; font-weight:600;">{{ status_text }}</span>
@@ -390,7 +393,7 @@ DAG_DASHBOARD_HTML = SHARED_STYLE + """
   </div>
 
   <!-- Main panel -->
-  <div class="dag-main">
+  <div class="dag-main" id="dag-main-panel" data-dag-id="{{ selected_dag.id if selected_dag else '' }}">
     {% if selected_dag %}
 
       <!-- Header -->
@@ -407,24 +410,33 @@ DAG_DASHBOARD_HTML = SHARED_STYLE + """
           {% for req in selected_dag.requirements %}
             <span class="{% if req == 'GPU' %}req-gpu{% else %}req-gen{% endif %}">{{ req }}</span>
           {% endfor %}
+          {% if selected_dag.can_redeploy %}
+          <button id="redeploy-btn"
+            onclick="redeployDag('{{ selected_dag.id }}')"
+            style="background:#0d1a2e; border:1px solid #4f8ef766; color:#64b5f6;
+                   font-size:12px; padding:5px 14px; border-radius:6px; cursor:pointer;
+                   font-weight:600; transition:background .2s;">
+            ↺ Redeploy
+          </button>
+          {% endif %}
         </div>
       </div>
 
       <!-- Stats -->
       <div class="stat-pills">
         {% for label, count, color in selected_dag.stat_pills %}
-        <div class="stat-pill"><b style="color:{{ color }}">{{ count }}</b>{{ label }}</div>
+        <div class="stat-pill"><b data-stat-pill="{{ label.upper() }}" style="color:{{ color }}">{{ count }}</b>{{ label }}</div>
         {% endfor %}
       </div>
 
       <!-- Progress -->
       <div style="display:flex; justify-content:space-between; font-size:11px; color:#555; margin-bottom:4px;">
-        <span>Progress</span><span>{{ selected_dag.done_pct }}%</span>
+        <span>Progress</span><span id="progress-pct">{{ selected_dag.done_pct }}%</span>
       </div>
       <div class="progress-bar">
-        <div class="progress-seg" style="width:{{ selected_dag.done_pct }}%; background:#4caf6e;"></div>
-        <div class="progress-seg" style="width:{{ selected_dag.run_pct }}%; background:#ffb74d;"></div>
-        <div class="progress-seg" style="width:{{ selected_dag.fail_pct }}%; background:#ff5252;"></div>
+        <div data-progress-seg="COMPLETED" class="progress-seg" style="width:{{ selected_dag.done_pct }}%; background:#4caf6e;"></div>
+        <div data-progress-seg="RUNNING"   class="progress-seg" style="width:{{ selected_dag.run_pct }}%;  background:#ffb74d;"></div>
+        <div data-progress-seg="FAILED"    class="progress-seg" style="width:{{ selected_dag.fail_pct }}%; background:#ff5252;"></div>
       </div>
 
       <!-- Graph -->
@@ -560,6 +572,10 @@ async function pollDagStatus() {
       const pctLabel = document.getElementById("progress-pct");
       if (pctLabel) pctLabel.textContent = pcts.COMPLETED + "%";
 
+      // Update stat pill progress % label
+      const seg = document.querySelector('[data-progress-seg="COMPLETED"]');
+      if (seg) seg.style.width = pcts.COMPLETED + "%";
+
       // ── 4. SVG graph nodes ──
       dag.jobs.forEach(j => {
         const prev = lastStatuses[j.id];
@@ -607,6 +623,52 @@ function patchBadge(el, status) {
 
 // Kick off polling immediately
 pollDagStatus();
+
+// ── Redeploy ─────────────────────────────────────────────────
+async function redeployDag(dagId) {
+  const btn = document.getElementById("redeploy-btn");
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = "⏳ Redeploying…";
+  btn.style.color = "#ffb74d";
+  btn.style.borderColor = "#ffb74d66";
+  try {
+    const r = await fetch(`/api/dag/redeploy/${encodeURIComponent(dagId)}`, { method: "POST" });
+    const data = await r.json();
+    if (r.ok && data.status === "ok") {
+      btn.textContent = "✓ Redeployed";
+      btn.style.color = "#4caf6e";
+      btn.style.borderColor = "#4caf6e66";
+      btn.style.background = "#0d2218";
+      setTimeout(() => {
+        btn.textContent = "↺ Redeploy";
+        btn.style.color = "#64b5f6";
+        btn.style.borderColor = "#4f8ef766";
+        btn.style.background = "#0d1a2e";
+        btn.disabled = false;
+      }, 3000);
+    } else {
+      btn.textContent = "✗ Failed";
+      btn.style.color = "#ff5252";
+      btn.style.borderColor = "#ff525266";
+      setTimeout(() => {
+        btn.textContent = "↺ Redeploy";
+        btn.style.color = "#64b5f6";
+        btn.style.borderColor = "#4f8ef766";
+        btn.style.background = "#0d1a2e";
+        btn.disabled = false;
+      }, 3000);
+    }
+  } catch {
+    btn.textContent = "✗ No connection";
+    btn.style.color = "#ff5252";
+    setTimeout(() => {
+      btn.textContent = "↺ Redeploy";
+      btn.style.color = "#64b5f6";
+      btn.disabled = false;
+    }, 3000);
+  }
+}
 </script>
 </body>
 """
@@ -618,6 +680,7 @@ LOG_VIEW_HTML = SHARED_STYLE + """
   <span class="topnav-brand">⚡ TITAN</span>
   <a class="tab" href="/">🖥 Orchestrator</a>
   <a class="tab" href="/dags">🔀 DAG Pipelines</a>
+  <a class="tab" href="/dags/new">✏️ Constructor</a>
 </nav>
 <div style="padding:20px; display:flex; flex-direction:column; height:calc(100vh - 89px);">
   <h2 style="margin-top:0; color:#64b5f6; border-bottom:1px solid #333; padding-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
@@ -737,9 +800,11 @@ def scan_yaml_dags():
             with open(manifest_path) as f:
                 manifest = json.load(f)
 
-            # Find latest run_ts per DAG
+            # Find latest run_ts per DAG (skip metadata keys like __payload__)
             dag_run_ts = {}
             for full_id, info in manifest.items():
+                if full_id.startswith("__") or "dag" not in info:
+                    continue
                 dag_name = info["dag"]
                 ts = info.get("run_ts", 0)
                 if ts > dag_run_ts.get(dag_name, 0):
@@ -748,9 +813,6 @@ def scan_yaml_dags():
             for dag_name, latest_ts in dag_run_ts.items():
                 dag_key = f"DAG-{dag_name}"
                 old_ts  = dag_registry.get(dag_key, {}).get("submitted", 0)
-                # Only reset if we've already seen this DAG in this session (old_ts > 0)
-                # and a genuinely new submission has arrived (latest_ts > old_ts).
-                # If old_ts == 0 it's first load — don't wipe statuses from worker history.
                 if old_ts > 0 and latest_ts > old_ts:
                     for jid in dag_registry[dag_key].get("job_meta", {}):
                         dag_registry[dag_key]["job_meta"][jid]["status"] = "WAITING"
@@ -758,6 +820,8 @@ def scan_yaml_dags():
                     dag_registry[dag_key]["submitted"] = latest_ts
 
             for full_id, info in manifest.items():
+                if full_id.startswith("__") or "dag" not in info:
+                    continue
                 _yaml_job_to_dag[full_id] = info["dag"]
                 _yaml_job_deps[full_id]   = info.get("deps", [])
                 dag_name = info["dag"]
@@ -856,7 +920,8 @@ def build_dag_svg(jobs_data):
             color = STATUS_DOT.get(parent_status, "#666")
             dash = 'stroke-dasharray="4 3"' if parent_status == "WAITING" else ""
             lines.append(
-                f'<path d="M{x1},{y1} C{mx},{y1} {mx},{y2} {x2},{y2}" '
+                f'<path data-edge-from="{pid}" '
+                f'd="M{x1},{y1} C{mx},{y1} {mx},{y2} {x2},{y2}" '
                 f'fill="none" stroke="{color}" stroke-width="1.5" opacity="0.6" marker-end="url(#arr)" {dash}/>'
             )
 
@@ -889,9 +954,9 @@ def build_dag_svg(jobs_data):
         lines.append(
             f'<a href="?job={j["id"]}">'
             f'<g class="node-g">'
-            f'<rect x="{x}" y="{y}" width="{NODE_W}" height="{NODE_H}" rx="8" '
+            f'<rect data-node-rect="{j["id"]}" x="{x}" y="{y}" width="{NODE_W}" height="{NODE_H}" rx="8" '
             f'fill="{fill}" stroke="{dot}" stroke-width="1.2"/>'
-            f'<circle cx="{x+13}" cy="{y+15}" r="5" fill="{dot}"/>'
+            f'<circle data-node-dot="{j["id"]}" cx="{x+13}" cy="{y+15}" r="5" fill="{dot}"/>'
             f'<text x="{x+26}" y="{y+19}" font-size="12" font-weight="500" fill="#e0e0e0" font-family="Segoe UI,sans-serif">{label}</text>'
             f'<text x="{x+10}" y="{y+36}" font-size="10" fill="#8888aa" font-family="Segoe UI,sans-serif">{extra}</text>'
             f'<text x="{x+10}" y="{y+52}" font-size="10" fill="#555577" font-family="Segoe UI,sans-serif">{worker_short}</text>'
@@ -1020,6 +1085,17 @@ def dag_dashboard(dag_id=None):
         requirements  = list({j["requirement"] for j in jobs_data})
         graph_svg     = build_dag_svg(jobs_data)
 
+        # Check if this DAG has a stored payload (i.e. was submitted via Constructor)
+        manifest_path = ".titan_dag_manifest.json"
+        can_redeploy  = False
+        try:
+            if os.path.exists(manifest_path):
+                with open(manifest_path) as _mf:
+                    _man = json.load(_mf)
+                can_redeploy = f"__payload__{meta['name']}" in _man
+        except Exception:
+            pass
+
         selected_dag = {
             "id":           dag_id,
             "name":         meta["name"],
@@ -1032,6 +1108,7 @@ def dag_dashboard(dag_id=None):
             "fail_pct":     fail_pct,
             "requirements": requirements,
             "graph_svg":    graph_svg,
+            "can_redeploy": can_redeploy,
             "stat_pills": [
                 ("Completed", done,    "#4caf6e"),
                 ("Running",   running, "#ffb74d"),
@@ -1060,9 +1137,147 @@ def dag_dashboard(dag_id=None):
     )
 
 
+@app.route('/dags/new')
+def dag_constructor():
+    return send_from_directory(
+        os.path.join(os.path.dirname(__file__)),
+        'dag_constructor.html'
+    )
+
+
+@app.route('/api/dag/submit', methods=['POST'])
+def api_dag_submit():
+    """Receives a DAG payload from the constructor UI and forwards it to TitanMaster."""
+    body = request.get_json(force=True)
+    if not body or not body.get('jobs'):
+        return jsonify({"error": "Missing jobs"}), 400
+
+    dag_name = body.get('name', 'my-pipeline')
+    jobs_raw = body['jobs']
+    perm_dir = os.path.dirname(os.path.abspath(__file__))
+
+    job_strings = []
+    for j in jobs_raw:
+        job_id   = j.get('id', '')
+        filename = j.get('filename', '')
+        req      = (j.get('requirement') or 'GENERAL').replace('|', '')
+        priority = j.get('priority', 1)
+        delay    = j.get('delay', 0)
+        affinity = j.get('affinity', False)
+        args     = (j.get('args') or '').replace('|', ' ')
+        parents  = j.get('depends_on') or []
+        job_type = (j.get('job_type') or 'run').lower()
+
+        parents_str     = '[' + ','.join(parents) + ']'
+        affinity_suffix = '|AFFINITY' if affinity else ''
+        simple_name     = os.path.basename(filename)
+
+        # Read and base64-encode the script from perm_files
+        file_path = os.path.join(perm_dir, simple_name)
+        if not os.path.exists(file_path):
+            return jsonify({"error": f"File not found in perm_files: {simple_name}"}), 400
+        with open(file_path, 'rb') as f:
+            payload_b64 = base64.b64encode(f.read()).decode('utf-8')
+
+        if job_type == 'service':
+            port = j.get('port', 0)
+            header = 'DEPLOY_PAYLOAD'
+            payload_content = f"{simple_name}|{payload_b64}|{port}|{req}"
+        else:
+            header = 'RUN_PAYLOAD'
+            payload_content = f"{simple_name}|{args}|{payload_b64}|{req}"
+
+        line = f"{job_id}|{header}|{payload_content}|{priority}|{delay}|{parents_str}{affinity_suffix}"
+        job_strings.append(line)
+
+    dag_payload = ' ; '.join(job_strings)
+    resp = titan_communicate(0x04, dag_payload)  # 0x04 = OP_SUBMIT_DAG
+
+    if resp and 'ERROR' not in (resp or '').upper():
+        # Write manifest so dashboard groups these jobs under the DAG name
+        _write_constructor_manifest(dag_name, jobs_raw, dag_payload)
+        return jsonify({"status": "ok", "response": resp})
+    return jsonify({"status": "error", "response": resp}), 502
+
+
+def _write_constructor_manifest(dag_name, jobs_raw, dag_payload=""):
+    """Mirrors what the Python SDK does — writes .titan_dag_manifest.json for dashboard grouping."""
+    manifest_path = ".titan_dag_manifest.json"
+    try:
+        existing = {}
+        if os.path.exists(manifest_path):
+            with open(manifest_path) as f:
+                existing = json.load(f)
+        run_ts = int(time.time() * 1000)
+        for j in jobs_raw:
+            full_id   = f"DAG-{j['id']}"
+            full_deps = [f"DAG-{p}" for p in (j.get('depends_on') or [])]
+            existing[full_id] = {
+                "dag":      dag_name,
+                "deps":     full_deps,
+                "run_ts":   run_ts,
+                "filename": os.path.basename(j.get('filename', '')),
+                "req":      j.get('requirement', 'GENERAL'),
+            }
+        # Store full payload for redeploy
+        existing[f"__payload__{dag_name}"] = {"dag_payload": dag_payload, "run_ts": run_ts}
+        with open(manifest_path, 'w') as f:
+            json.dump(existing, f, indent=2)
+    except Exception:
+        pass
+
+
+@app.route('/api/dag/redeploy/<dag_id>', methods=['POST'])
+def api_dag_redeploy(dag_id):
+    """Re-submits a DAG by replaying the stored payload from the manifest."""
+    manifest_path = ".titan_dag_manifest.json"
+    if not os.path.exists(manifest_path):
+        return jsonify({"error": "No manifest — submit this DAG at least once first"}), 404
+
+    with open(manifest_path) as f:
+        manifest = json.load(f)
+
+    # Resolve the DAG name from dag_id (strip the DAG- prefix)
+    dag_name = dag_id[4:] if dag_id.startswith("DAG-") else dag_id
+
+    payload_key = f"__payload__{dag_name}"
+    if payload_key not in manifest:
+        return jsonify({"error": f"No stored payload for '{dag_name}'. Re-submit via the SDK or Constructor to enable redeploy."}), 404
+
+    dag_payload = manifest[payload_key].get("dag_payload", "")
+    if not dag_payload:
+        return jsonify({"error": "Stored payload is empty"}), 400
+
+    resp = titan_communicate(0x04, dag_payload)
+
+    if resp and 'ERROR' not in (resp or '').upper():
+        # Update run_ts on all jobs and the payload entry so stale detection resets
+        run_ts = int(time.time() * 1000)
+        for key, val in manifest.items():
+            if isinstance(val, dict) and val.get("dag") == dag_name:
+                val["run_ts"] = run_ts
+        manifest[payload_key]["run_ts"] = run_ts
+        with open(manifest_path, 'w') as f:
+            json.dump(manifest, f, indent=2)
+        return jsonify({"status": "ok", "response": resp})
+
+    return jsonify({"status": "error", "response": resp}), 502
+
+
 @app.route('/api/dag_status')
 def api_dag_status():
-    """JSON endpoint — useful for future JS polling."""
+    """JSON endpoint polled every 3s by the dashboard JS."""
+    # Refresh registry from master on every poll so statuses are live
+    scan_yaml_dags()
+    raw_json = titan_communicate(OP_STATS_JSON, "")
+    if raw_json:
+        try:
+            json_start = raw_json.find('{')
+            if json_start != -1:
+                discover_dags_from_stats(json.loads(raw_json[json_start:]))
+        except Exception:
+            pass
+
     result = []
     for did, meta in dag_registry.items():
         jobs_meta = meta.get("job_meta", {})

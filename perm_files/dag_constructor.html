@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Titan — DAG Constructor</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; background: #121212; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #1a1a1a; }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useCallback, useEffect } = React;
+
+    // ── Constants ─────────────────────────────────────────────────
+    const NODE_W = 172, NODE_H = 72;
+    const GRID = 20;
+    const snap = v => Math.round(v / GRID) * GRID;
+
+    const REQ_OPTIONS  = ["GENERAL", "GPU", "HIGH_MEM", "PYTHON"];
+    const TYPE_OPTIONS = ["run", "service"];
+
+    const COLORS = {
+      GENERAL:  { border:"#4CAF50", bg:"#0d1f0d" },
+      GPU:      { border:"#ce93d8", bg:"#1a0d1f" },
+      HIGH_MEM: { border:"#4f8ef7", bg:"#0d1020" },
+      PYTHON:   { border:"#ffb74d", bg:"#1f1500" },
+    };
+
+    let _id = 1;
+    const uid = () => `node-${_id++}`;
+
+    // ── Helpers ───────────────────────────────────────────────────
+    function genYaml(nodes, edges, dagName) {
+      const depends = {};
+      edges.forEach(e => {
+        depends[e.to] = depends[e.to] || [];
+        const f = nodes.find(n => n.id === e.from);
+        if (f) depends[e.to].push(f.data.jobId);
+      });
+      const lines = [`name: "${dagName || "my-pipeline"}"`, `project: true`, ``, `jobs:`];
+      nodes.forEach(n => {
+        const d = n.data;
+        lines.push(`  - id: "${d.jobId}"`);
+        lines.push(`    type: "${d.type}"`);
+        lines.push(`    file: "${d.file || "scripts/task.py"}"`);
+        if (d.requirement !== "GENERAL") lines.push(`    requirement: "${d.requirement}"`);
+        if (d.priority !== 1)  lines.push(`    priority: ${d.priority}`);
+        if (d.delay > 0)       lines.push(`    delay: ${d.delay}`);
+        if (d.affinity)        lines.push(`    affinity: true`);
+        if (d.args)            lines.push(`    args: "${d.args}"`);
+        if (d.type === "service" && d.port) lines.push(`    port: ${d.port}`);
+        const deps = depends[n.id];
+        if (deps?.length) lines.push(`    depends_on: [${deps.map(x => `"${x}"`).join(", ")}]`);
+        lines.push(``);
+      });
+      return lines.join("\n");
+    }
+
+    function genSdk(nodes, edges, dagName) {
+      const depends = {};
+      edges.forEach(e => {
+        depends[e.to] = depends[e.to] || [];
+        const f = nodes.find(n => n.id === e.from);
+        if (f) depends[e.to].push(f.data.jobId);
+      });
+      const lines = [`from titan_sdk import TitanClient, TitanJob`, ``,
+        `client = TitanClient()`, ``];
+      nodes.forEach(n => {
+        const d = n.data;
+        const v = d.jobId.replace(/[^a-zA-Z0-9]/g, "_");
+        const deps = depends[n.id] || [];
+        lines.push(`${v} = TitanJob(`);
+        lines.push(`    job_id="${d.jobId}",`);
+        lines.push(`    filename="${d.file || "scripts/task.py"}",`);
+        if (d.type === "service") lines.push(`    job_type="SERVICE",`);
+        if (d.args)  lines.push(`    args="${d.args}",`);
+        if (d.requirement !== "GENERAL") lines.push(`    requirement="${d.requirement}",`);
+        if (d.priority !== 1)  lines.push(`    priority=${d.priority},`);
+        if (d.delay > 0)       lines.push(`    delay=${d.delay},`);
+        if (d.affinity)        lines.push(`    affinity=True,`);
+        if (d.type === "service" && d.port) lines.push(`    port=${d.port},`);
+        if (deps.length)       lines.push(`    parents=[${deps.map(x => `"${x}"`).join(", ")}],`);
+        lines.push(`)`);
+        lines.push(``);
+      });
+      const vars = nodes.map(n => n.data.jobId.replace(/[^a-zA-Z0-9]/g, "_"));
+      lines.push(`client.submit_dag("${dagName || "my-pipeline"}", [${vars.join(", ")}])`);
+      return lines.join("\n");
+    }
+
+    // ── Styles ────────────────────────────────────────────────────
+    const sidebarWrap  = { width:240, flexShrink:0, background:"#141420", borderLeft:"1px solid #2a2a2a", padding:16, overflowY:"auto", display:"flex", flexDirection:"column" };
+    const sidebarTitle = { fontSize:12, fontWeight:600, textTransform:"uppercase", letterSpacing:".07em", color:"#555", marginBottom:12 };
+    const labelStyle   = { fontSize:11, color:"#777", marginBottom:4, marginTop:10, display:"block" };
+    const inputStyle   = { width:"100%", background:"#0d0d14", border:"1px solid #2a2a2a", color:"#e0e0e0", fontSize:12, padding:"6px 8px", borderRadius:6, outline:"none", boxSizing:"border-box" };
+    const dangerBtn    = { background:"none", border:"1px solid #ff525244", color:"#ff5252", fontSize:12, padding:"5px 12px", borderRadius:6, cursor:"pointer" };
+
+    // ── Deploy button ─────────────────────────────────────────────
+    function DeployButton({ nodes, edges, dagName }) {
+      const [state, setState] = useState("idle");
+      const [msg,   setMsg]   = useState("");
+
+      const deploy = async () => {
+        if (!nodes.length) { setMsg("Add at least one node."); setState("error"); setTimeout(()=>setState("idle"),3000); return; }
+        const bad = nodes.find(n => !n.data.jobId || !n.data.file);
+        if (bad) { setMsg(`"${bad.data.jobId||"unnamed"}" needs Job ID + file.`); setState("error"); setTimeout(()=>setState("idle"),3000); return; }
+        setState("loading"); setMsg("");
+
+        const depMap = {};
+        edges.forEach(e => {
+          depMap[e.to] = depMap[e.to] || [];
+          const f = nodes.find(n => n.id === e.from);
+          if (f) depMap[e.to].push(f.data.jobId);
+        });
+
+        const payload = {
+          name: dagName || "my-pipeline",
+          jobs: nodes.map(n => ({
+            id:          n.data.jobId,
+            filename:    n.data.file,
+            job_type:    n.data.type === "service" ? "service" : "run",
+            requirement: n.data.requirement,
+            priority:    n.data.priority,
+            delay:       n.data.delay,
+            affinity:    n.data.affinity,
+            args:        n.data.args || "",
+            port:        n.data.port || 0,
+            is_archive:  false,
+            depends_on:  depMap[n.id] || [],
+          }))
+        };
+
+        try {
+          const r = await fetch("/api/dag/submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await r.json();
+          if (r.ok && data.status === "ok") {
+            setMsg(`✓ "${payload.name}" submitted (${nodes.length} jobs)`);
+            setState("success");
+          } else {
+            setMsg(data.response || "Submission failed");
+            setState("error");
+          }
+          setTimeout(() => { setState("idle"); setMsg(""); }, 4000);
+        } catch(e) {
+          setMsg("Connection failed — is Master running?");
+          setState("error");
+          setTimeout(() => setState("idle"), 4000);
+        }
+      };
+
+      return (
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          {msg && <span style={{ fontSize:11, color:state==="success"?"#4caf6e":"#ff5252", maxWidth:240, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{msg}</span>}
+          <button onClick={deploy} disabled={state==="loading"} style={{
+            fontSize:12, padding:"5px 14px", borderRadius:6, cursor:state==="loading"?"not-allowed":"pointer",
+            fontWeight:600, border:"none", transition:"background .2s",
+            background: state==="success"?"#1a3320":state==="error"?"#2a1010":"#185FA5",
+            color:       state==="success"?"#4caf6e":state==="error"?"#ff5252":"#fff",
+            opacity:     state==="loading"?0.7:1,
+          }}>
+            {state==="loading"?"⏳ Deploying…":state==="success"?"✓ Deployed":state==="error"?"✗ Failed":"🚀 Deploy to Titan"}
+          </button>
+        </div>
+      );
+    }
+
+    // ── Output panel ──────────────────────────────────────────────
+    function OutputPanel({ nodes, edges, dagName }) {
+      const [tab, setTab]       = useState("yaml");
+      const [copied, setCopied] = useState(false);
+      const content = tab === "yaml" ? genYaml(nodes, edges, dagName) : genSdk(nodes, edges, dagName);
+      const copy = () => {
+        navigator.clipboard?.writeText(content).catch(() => {});
+        setCopied(true); setTimeout(() => setCopied(false), 1500);
+      };
+      return (
+        <div style={{ height:200, borderTop:"1px solid #2a2a2a", display:"flex", flexDirection:"column", background:"#0d0d14", flexShrink:0 }}>
+          <div style={{ display:"flex", alignItems:"center", borderBottom:"1px solid #2a2a2a", padding:"0 12px" }}>
+            {[["yaml","YAML"],["sdk","Python SDK"]].map(([k,l]) => (
+              <button key={k} onClick={() => setTab(k)} style={{
+                background:"none", border:"none", color:tab===k?"#64b5f6":"#555",
+                borderBottom:`2px solid ${tab===k?"#64b5f6":"transparent"}`,
+                padding:"7px 14px", fontSize:11, fontWeight:600, cursor:"pointer", letterSpacing:".05em", textTransform:"uppercase",
+              }}>{l}</button>
+            ))}
+            <button onClick={copy} style={{ marginLeft:"auto", background:copied?"#1a3320":"#1a1a2e",
+              border:`1px solid ${copied?"#4caf6e":"#2a2a3a"}`, color:copied?"#4caf6e":"#aaa",
+              fontSize:11, padding:"4px 12px", borderRadius:6, cursor:"pointer" }}>
+              {copied ? "✓ Copied" : "Copy"}
+            </button>
+          </div>
+          <pre style={{ flex:1, overflowY:"auto", margin:0, padding:"10px 14px", fontSize:11,
+            color:"#a8c0d8", fontFamily:"'Consolas','Fira Code',monospace", lineHeight:1.7,
+            whiteSpace:"pre-wrap", wordBreak:"break-word" }}>
+            {content || "# Add nodes to generate output"}
+          </pre>
+        </div>
+      );
+    }
+
+    // ── Sidebar ───────────────────────────────────────────────────
+    function Sidebar({ node, onChange, onDelete, selectedEdge, onDeleteEdge, dagName, onDagNameChange }) {
+      if (selectedEdge) return (
+        <div style={sidebarWrap}>
+          <div style={sidebarTitle}>Edge</div>
+          <div style={{ fontSize:12, color:"#777", marginBottom:16 }}>Dependency connection selected</div>
+          <button onClick={onDeleteEdge} style={dangerBtn}>🗑 Delete Edge</button>
+        </div>
+      );
+      if (!node) return (
+        <div style={sidebarWrap}>
+          <div style={sidebarTitle}>DAG Settings</div>
+          <label style={labelStyle}>Pipeline Name</label>
+          <input value={dagName} onChange={e => onDagNameChange(e.target.value)} placeholder="my-pipeline" style={inputStyle}/>
+          <div style={{ marginTop:24, borderTop:"1px solid #2a2a2a", paddingTop:16 }}>
+            <div style={{ fontSize:11, color:"#555", lineHeight:1.8 }}>
+              <div style={{ marginBottom:8, color:"#777", fontWeight:600 }}>How to connect nodes</div>
+              <div>① Hover a node — a <span style={{color:"#ffb74d"}}>●</span> port appears on the right edge</div>
+              <div style={{marginTop:4}}>② Click and drag the port to another node</div>
+              <div style={{marginTop:4}}>③ Release over the target node</div>
+              <div style={{marginTop:4}}>④ Blue arrow = dependency created</div>
+              <div style={{marginTop:12,color:"#777",fontWeight:600}}>Keyboard</div>
+              <div style={{marginTop:4}}>Delete / Backspace → remove selected node or edge</div>
+            </div>
+          </div>
+        </div>
+      );
+      const d = node.data;
+      const upd = (k, v) => onChange(node.id, { ...d, [k]:v });
+      return (
+        <div style={sidebarWrap}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+            <div style={sidebarTitle}>Configure Node</div>
+            <button onClick={() => onDelete(node.id)} style={{ ...dangerBtn, padding:"3px 8px", fontSize:11 }}>🗑</button>
+          </div>
+          <label style={labelStyle}>Job ID *</label>
+          <input value={d.jobId} onChange={e => upd("jobId", e.target.value)} style={inputStyle} placeholder="my-task"/>
+          <label style={labelStyle}>Script File *</label>
+          <input value={d.file} onChange={e => upd("file", e.target.value)} style={inputStyle} placeholder="scripts/task.py"/>
+          <label style={labelStyle}>Type</label>
+          <select value={d.type} onChange={e => upd("type", e.target.value)} style={inputStyle}>
+            {TYPE_OPTIONS.map(t => <option key={t}>{t}</option>)}
+          </select>
+          <label style={labelStyle}>Requirement</label>
+          <select value={d.requirement} onChange={e => upd("requirement", e.target.value)} style={inputStyle}>
+            {REQ_OPTIONS.map(r => <option key={r}>{r}</option>)}
+          </select>
+          {d.type === "service" && <>
+            <label style={labelStyle}>Port</label>
+            <input type="number" value={d.port||""} onChange={e => upd("port", parseInt(e.target.value)||0)} style={inputStyle} placeholder="8000"/>
+          </>}
+          <label style={labelStyle}>Args</label>
+          <input value={d.args} onChange={e => upd("args", e.target.value)} style={inputStyle} placeholder="--mode prod"/>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+            <div>
+              <label style={labelStyle}>Priority</label>
+              <input type="number" min="1" max="10" value={d.priority} onChange={e => upd("priority", parseInt(e.target.value)||1)} style={inputStyle}/>
+            </div>
+            <div>
+              <label style={labelStyle}>Delay (s)</label>
+              <input type="number" min="0" value={d.delay} onChange={e => upd("delay", parseInt(e.target.value)||0)} style={inputStyle}/>
+            </div>
+          </div>
+          <label style={{ ...labelStyle, display:"flex", alignItems:"center", gap:8, cursor:"pointer", marginTop:10 }}>
+            <input type="checkbox" checked={d.affinity} onChange={e => upd("affinity", e.target.checked)}
+              style={{ accentColor:"#ffb74d", width:14, height:14 }}/>
+            <span>Sticky Scheduling (affinity)</span>
+          </label>
+          <div style={{ fontSize:10, color:"#555", marginTop:3, paddingLeft:22 }}>Force task to run on same node as parent</div>
+        </div>
+      );
+    }
+
+    // ── Main ──────────────────────────────────────────────────────
+    function DagConstructor() {
+      const [nodes, setNodes]       = useState([]);
+      const [edges, setEdges]       = useState([]);
+      const [selected, setSelected] = useState(null);
+      const [selEdge, setSelEdge]   = useState(null);
+      const [dagName, setDagName]   = useState("my-pipeline");
+
+      const drawing  = useRef(null);
+      const dragging = useRef(null);
+      const nodesRef = useRef(nodes);
+      useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+
+      const [mouse, setMouse] = useState({ x:0, y:0 });
+      const canvasRef = useRef(null);
+      const getOffset = () => {
+        const r = canvasRef.current?.getBoundingClientRect();
+        return r ? { x: r.left, y: r.top } : { x:0, y:0 };
+      };
+
+      const addNode = type => {
+        const id = uid();
+        const idx = nodesRef.current.length;
+        setNodes(n => [...n, {
+          id, x: snap(60 + (idx % 4) * 200), y: snap(80 + Math.floor(idx / 4) * 130),
+          data: { jobId:`task-${idx+1}`, file:"", type, requirement:"GENERAL", args:"", priority:1, delay:0, affinity:false, port:0 }
+        }]);
+        setSelected(id); setSelEdge(null);
+      };
+
+      const deleteNode = id => {
+        setNodes(n => n.filter(x => x.id !== id));
+        setEdges(e => e.filter(x => x.from !== id && x.to !== id));
+        if (selected === id) setSelected(null);
+      };
+
+      const updateNode = (id, data) => setNodes(n => n.map(x => x.id === id ? { ...x, data } : x));
+
+      useEffect(() => {
+        const h = e => {
+          if (e.key !== "Delete" && e.key !== "Backspace") return;
+          const tag = document.activeElement?.tagName;
+          if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+          if (selected)  deleteNode(selected);
+          if (selEdge) { setEdges(ed => ed.filter(x => x.id !== selEdge)); setSelEdge(null); }
+        };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+      }, [selected, selEdge]);
+
+      const nodeAtPoint = useCallback((cx, cy) => {
+        const ns = nodesRef.current;
+        for (let i = ns.length - 1; i >= 0; i--) {
+          const n = ns[i];
+          if (cx >= n.x && cx <= n.x + NODE_W && cy >= n.y && cy <= n.y + NODE_H) return n;
+        }
+        return null;
+      }, []);
+
+      const onMouseMove = useCallback(e => {
+        setMouse({ x: e.clientX, y: e.clientY });
+        if (!dragging.current) return;
+        const off = getOffset();
+        const x = snap(Math.max(0, e.clientX - off.x - dragging.current.ox));
+        const y = snap(Math.max(0, e.clientY - off.y - dragging.current.oy));
+        setNodes(n => n.map(nd => nd.id === dragging.current.id ? { ...nd, x, y } : nd));
+      }, []);
+
+      const onMouseUp = useCallback(e => {
+        if (drawing.current) {
+          const off = getOffset();
+          const hit = nodeAtPoint(e.clientX - off.x, e.clientY - off.y);
+          const from = drawing.current.fromId;
+          if (hit && hit.id !== from) {
+            const edgeId = `e-${from}-${hit.id}`;
+            setEdges(ed => {
+              const dup = ed.some(x => (x.from===from&&x.to===hit.id)||(x.from===hit.id&&x.to===from));
+              return dup ? ed : [...ed, { id: edgeId, from, to: hit.id }];
+            });
+          }
+          drawing.current = null;
+        }
+        dragging.current = null;
+      }, [nodeAtPoint]);
+
+      useEffect(() => {
+        window.addEventListener("mousemove", onMouseMove);
+        window.addEventListener("mouseup", onMouseUp);
+        return () => {
+          window.removeEventListener("mousemove", onMouseMove);
+          window.removeEventListener("mouseup", onMouseUp);
+        };
+      }, [onMouseMove, onMouseUp]);
+
+      const onNodeMouseDown = (e, id) => {
+        if (drawing.current) return;
+        e.stopPropagation();
+        setSelected(id); setSelEdge(null);
+        const node = nodesRef.current.find(n => n.id === id);
+        const off  = getOffset();
+        dragging.current = { id, ox: e.clientX - off.x - node.x, oy: e.clientY - off.y - node.y };
+      };
+
+      const onPortMouseDown = (e, fromId) => {
+        e.stopPropagation();
+        e.preventDefault();
+        dragging.current = null;
+        drawing.current  = { fromId };
+        setSelected(null); setSelEdge(null);
+      };
+
+      const byId   = Object.fromEntries(nodes.map(n => [n.id, n]));
+      const off    = canvasRef.current?.getBoundingClientRect() || { left:0, top:0 };
+      const isDrawing = !!drawing.current;
+      const fromNode  = drawing.current ? byId[drawing.current.fromId] : null;
+
+      const edgePath = (x1,y1,x2,y2) => {
+        const mx = (x1+x2)/2;
+        return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+      };
+
+      const selectedNode = nodes.find(n => n.id === selected);
+
+      return (
+        <div style={{ background:"#121212", color:"#e0e0e0", fontFamily:"'Segoe UI',sans-serif",
+          fontSize:14, height:"100vh", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+
+          <style>{`
+            .port-handle { opacity: 0; transition: opacity .15s; }
+            .titan-node:hover .port-handle { opacity: 1; }
+          `}</style>
+
+          {/* Topbar */}
+          <div style={{ background:"#1a1a2e", borderBottom:"1px solid #2a2a3a", padding:"0 16px",
+            display:"flex", alignItems:"center", gap:8, height:48, flexShrink:0 }}>
+            <a href="/" style={{ fontSize:13, color:"#555", textDecoration:"none", marginRight:4 }}>← Dashboard</a>
+            <span style={{ color:"#2a2a3a" }}>|</span>
+            <span style={{ fontSize:15, fontWeight:700, letterSpacing:1, marginRight:4 }}>⚡ Titan</span>
+            <span style={{ fontSize:12, color:"#444", marginRight:12 }}>DAG Constructor</span>
+            <button onClick={() => addNode("run")} style={{ background:"#0d1f0d", border:"1px solid #4CAF5066",
+              color:"#4CAF50", fontSize:12, padding:"5px 12px", borderRadius:6, cursor:"pointer", fontWeight:500 }}>
+              + Add Task
+            </button>
+            <button onClick={() => addNode("service")} style={{ background:"#162040", border:"1px solid #4f8ef766",
+              color:"#4f8ef7", fontSize:12, padding:"5px 12px", borderRadius:6, cursor:"pointer", fontWeight:500 }}>
+              + Add Service
+            </button>
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginLeft:8 }}>
+              <span style={{ fontSize:11, color:"#555" }}>Pipeline:</span>
+              <input value={dagName} onChange={e => setDagName(e.target.value)}
+                style={{ background:"#0d0d14", border:"1px solid #2a2a2a", color:"#e0e0e0",
+                  fontSize:12, padding:"4px 8px", borderRadius:6, outline:"none", width:140 }}/>
+            </div>
+            <div style={{ marginLeft:"auto", display:"flex", gap:10, alignItems:"center" }}>
+              {nodes.length > 0 && <span style={{ fontSize:11, color:"#444" }}>{nodes.length} nodes · {edges.length} edges</span>}
+              <button onClick={() => { setNodes([]); setEdges([]); setSelected(null); setSelEdge(null); }}
+                style={{ background:"none", border:"1px solid #2a2a2a", color:"#555", fontSize:11, padding:"4px 10px", borderRadius:6, cursor:"pointer" }}>
+                Clear
+              </button>
+              <DeployButton nodes={nodes} edges={edges} dagName={dagName}/>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div style={{ flex:1, display:"flex", overflow:"hidden", minHeight:0 }}>
+
+            {/* Canvas + output */}
+            <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minWidth:0 }}>
+
+              {/* Canvas */}
+              <div ref={canvasRef}
+                onClick={e => {
+                  if (e.target === canvasRef.current) {
+                    setSelected(null); setSelEdge(null);
+                  }
+                }}
+                style={{
+                  flex:1, position:"relative", overflow:"auto",
+                  cursor: isDrawing ? "crosshair" : "default",
+                  backgroundImage: "radial-gradient(circle, #2a2a3a 1px, transparent 1px)",
+                  backgroundSize: `${GRID*2}px ${GRID*2}px`,
+                  userSelect: "none",
+                }}>
+
+                <div style={{ minWidth:1400, minHeight:700, position:"relative" }}>
+
+                  {/* SVG edges */}
+                  <svg style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%",
+                    pointerEvents:"none", overflow:"visible" }}>
+                    <defs>
+                      <marker id="ah"  markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0,10 3.5,0 7" fill="#4f8ef7"/>
+                      </marker>
+                      <marker id="ahs" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0,10 3.5,0 7" fill="#ffb74d"/>
+                      </marker>
+                    </defs>
+
+                    {edges.map(e => {
+                      const f = byId[e.from], t = byId[e.to];
+                      if (!f || !t) return null;
+                      const x1=f.x+NODE_W, y1=f.y+NODE_H/2, x2=t.x, y2=t.y+NODE_H/2;
+                      const sel = selEdge === e.id;
+                      return (
+                        <g key={e.id} style={{ pointerEvents:"stroke", cursor:"pointer" }}
+                          onClick={ev => { ev.stopPropagation(); setSelEdge(sel?null:e.id); setSelected(null); }}>
+                          <path d={edgePath(x1,y1,x2,y2)} fill="none" stroke="transparent" strokeWidth={14}/>
+                          <path d={edgePath(x1,y1,x2,y2)} fill="none"
+                            stroke={sel?"#ffb74d":"#4f8ef7"} strokeWidth={sel?2.5:1.8}
+                            opacity={sel?1:0.75} strokeDasharray={sel?"6 3":"none"}
+                            markerEnd={sel?"url(#ahs)":"url(#ah)"}/>
+                        </g>
+                      );
+                    })}
+
+                    {isDrawing && fromNode && (() => {
+                      const x1 = fromNode.x + NODE_W, y1 = fromNode.y + NODE_H/2;
+                      const x2 = mouse.x - off.left, y2 = mouse.y - off.top;
+                      return (
+                        <path d={edgePath(x1,y1,x2,y2)} fill="none"
+                          stroke="#ffb74d" strokeWidth={1.8} strokeDasharray="6 3" opacity={.8}
+                          markerEnd="url(#ahs)"/>
+                      );
+                    })()}
+                  </svg>
+
+                  {/* Nodes */}
+                  {nodes.map(n => {
+                    const c = COLORS[n.data.requirement] || COLORS.GENERAL;
+                    const border = n.data.type === "service" ? "#4f8ef7" : c.border;
+                    const sel    = selected === n.id;
+                    const label  = n.data.jobId.length > 16 ? n.data.jobId.slice(0,15)+"…" : n.data.jobId;
+                    const file   = (n.data.file||"").split("/").pop();
+
+                    return (
+                      <div key={n.id}
+                        className="titan-node"
+                        onMouseDown={e => onNodeMouseDown(e, n.id)}
+                        onClick={e => e.stopPropagation()}
+                        style={{ position:"absolute", left:n.x, top:n.y,
+                          width:NODE_W, height:NODE_H, cursor:"grab" }}>
+
+                        <div style={{
+                          width:"100%", height:"100%", borderRadius:10,
+                          background: sel ? c.bg : "#1a1a24",
+                          border: `${sel?2:1.5}px solid ${sel ? border : "#2e2e3e"}`,
+                          boxShadow: sel ? `0 0 0 2px ${border}33` : "none",
+                          display:"flex", flexDirection:"column", justifyContent:"center",
+                          padding:"8px 12px", position:"relative",
+                          transition:"border-color .12s, background .12s",
+                          pointerEvents:"none",
+                        }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4 }}>
+                            <div style={{ width:8, height:8, borderRadius:"50%", background:border, flexShrink:0 }}/>
+                            <span style={{ fontSize:12, fontWeight:600, color:"#e0e0e0", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{label}</span>
+                            {n.data.type==="service" && (
+                              <span style={{ fontSize:9, background:"#162040", color:"#4f8ef7", padding:"1px 5px", borderRadius:99, flexShrink:0 }}>svc</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize:10, color:"#606080", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{file||"no file set"}</div>
+                          <div style={{ display:"flex", gap:4, marginTop:5, flexWrap:"wrap" }}>
+                            <span style={{ fontSize:9, padding:"1px 6px", borderRadius:99, background:c.bg, color:border, border:`1px solid ${border}44` }}>{n.data.requirement}</span>
+                            {n.data.affinity && <span style={{ fontSize:9, padding:"1px 6px", borderRadius:99, background:"#1f1500", color:"#ffb74d", border:"1px solid #ffb74d44" }}>sticky</span>}
+                            {n.data.priority>1 && <span style={{ fontSize:9, padding:"1px 6px", borderRadius:99, background:"#0d1020", color:"#4f8ef7", border:"1px solid #4f8ef744" }}>p:{n.data.priority}</span>}
+                          </div>
+                        </div>
+
+                        <div
+                          className="port-handle"
+                          onMouseDown={e => onPortMouseDown(e, n.id)}
+                          style={{
+                            position:"absolute", right:-7, top:NODE_H/2-7,
+                            width:14, height:14, borderRadius:"50%", zIndex:20,
+                            background: isDrawing && drawing.current?.fromId===n.id ? "#ffb74d" : "#1a1a2e",
+                            border:`2px solid ${border}`,
+                            cursor:"crosshair",
+                            boxShadow: `0 0 0 3px ${border}33`,
+                          }}/>
+                      </div>
+                    );
+                  })}
+
+                  {nodes.length === 0 && (
+                    <div style={{ position:"absolute", top:"45%", left:"50%", transform:"translate(-50%,-50%)",
+                      textAlign:"center", pointerEvents:"none", userSelect:"none" }}>
+                      <div style={{ fontSize:40, marginBottom:12 }}>⚡</div>
+                      <div style={{ fontSize:14, fontWeight:500, color:"#3a3a4a", marginBottom:6 }}>Start building your DAG</div>
+                      <div style={{ fontSize:12, color:"#2a2a3a" }}>Click <span style={{color:"#4CAF50"}}>+ Add Task</span> or <span style={{color:"#4f8ef7"}}>+ Add Service</span> to begin</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <OutputPanel nodes={nodes} edges={edges} dagName={dagName}/>
+            </div>
+
+            <Sidebar
+              node={selectedNode}
+              onChange={updateNode}
+              onDelete={deleteNode}
+              selectedEdge={selEdge}
+              onDeleteEdge={() => { setEdges(e => e.filter(x => x.id !== selEdge)); setSelEdge(null); }}
+              dagName={dagName}
+              onDagNameChange={setDagName}/>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<DagConstructor/>);
+  </script>
+</body>
+</html>
