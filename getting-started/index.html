@@ -574,6 +574,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="4. Open the Dashboard">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dag-visualizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DAG Visualizer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#visual-dag-constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visual DAG Constructor
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -699,10 +727,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#6-run-your-first-task" class="md-nav__link">
+  <a href="#6-run-your-first-task-manual-setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. Run Your First Task
+        6. Run Your First Task (Manual Setup)
       
     </span>
   </a>
@@ -1314,6 +1342,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="4. Open the Dashboard">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dag-visualizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DAG Visualizer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#visual-dag-constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visual DAG Constructor
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1439,10 +1495,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#6-run-your-first-task" class="md-nav__link">
+  <a href="#6-run-your-first-task-manual-setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. Run Your First Task
+        6. Run Your First Task (Manual Setup)
       
     </span>
   </a>
@@ -1580,7 +1636,24 @@
 </ol>
 <h2 id="4-open-the-dashboard">4. Open the Dashboard</h2>
 <p>If you have flask installed (pip install flask), the titan-dev script automatically started the UI.</p>
-<p>Navigate to http://localhost:5000 in your browser to see your Worker node's live CPU/Thread load and the execution history of the DAG you just ran.</p>
+<p>Navigate to <strong><code>http://localhost:5000</code></strong> in your browser to see your Worker node's live CPU/Thread load and the execution history of the DAG you just ran.</p>
+<h3 id="dag-visualizer">DAG Visualizer</h3>
+<p>Once a DAG has been submitted — via the CLI, Python SDK, YAML, or the Constructor — open the <strong>DAG Pipelines</strong> tab in the dashboard to see it rendered as a live graph. Node colors update in real-time as jobs move through <code>PENDING → RUNNING → COMPLETED / FAILED</code>.</p>
+<p>This works for any submission method. YAML and SDK-based pipelines are represented accurately with full structure. Dynamic DAGs are visualized based on the graph submitted to the Master at runtime. Agentic DAGs will appear and grow as the agent submits new work — the full graph may not be known upfront, but everything submitted will be visible.</p>
+<p><img alt="DAG Visualizer" src="../screenshots/DAG_Visualizer_.png" /></p>
+<h3 id="visual-dag-constructor">Visual DAG Constructor</h3>
+<p>Rather than writing YAML or SDK code, you can build and deploy pipelines directly from the browser.</p>
+<p>Open the DAG Constructor at <strong><code>http://localhost:5000/dags/new</code></strong>:</p>
+<ol>
+<li><strong>Add nodes</strong> — each node represents a job. Set the Job ID, script filename, requirement (GENERAL / GPU), args, priority, and delay.</li>
+<li><strong>Draw edges</strong> — click and drag from the output port of one node to the input port of another to define dependencies.</li>
+<li><strong>Deploy</strong> — hit the <strong>Deploy</strong> button to submit the pipeline to the running cluster.</li>
+</ol>
+<p>The Constructor also auto-generates the equivalent <strong>Python SDK</strong> and <strong>YAML</strong> code in the output panel, which you can copy for reuse in automated pipelines.</p>
+<blockquote>
+<p><strong>Note:</strong> The Deploy button submits jobs by reading script files from the Master's <code>perm_files</code> directory by filename. Make sure any scripts you reference in the Constructor already exist in <code>perm_files</code> before clicking Deploy.</p>
+</blockquote>
+<p><img alt="DAG Constructor" src="../screenshots/DAG_Editor.png" /></p>
 <h2 id="5-advanced-manual-ide-setup">5. Advanced: Manual &amp; IDE Setup</h2>
 <h3 id="option-5-run-via-intellij-recommended-for-dev">Option 5: Run via IntelliJ (Recommended for Dev)</h3>
 <p>If you are developing Titan, simply open the project in IntelliJ IDEA and run the Main classes directly:</p>
@@ -1704,8 +1777,8 @@ You can easily spawn specialized nodes by passing arguments: <code>[Port] [Maste
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
 </span></code></pre></div>
 <hr />
-<h2 id="6-run-your-first-task">6. Run Your First Task</h2>
-<p>Let's deploy a pre-configured YAML DAG to the cluster using the Titan CLI.</p>
+<h2 id="6-run-your-first-task-manual-setup">6. Run Your First Task (Manual Setup)</h2>
+<p>Once your cluster is up via the manual steps above, deploy the same YAML DAG:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>python<span class="w"> </span>titan_sdk/titan_cli.py<span class="w"> </span>deploy<span class="w"> </span>titan_test_suite/examples/yaml_based_static_tests/dag_structure_test/agent.yaml
 </span></code></pre></div>
 <p><strong>What just happened?</strong></p>
@@ -1721,6 +1794,7 @@ You can easily spawn specialized nodes by passing arguments: <code>[Port] [Maste
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>python3<span class="w"> </span>./perm_files/server_dashboard.py
 </span></code></pre></div>
 <p>Navigate to <strong><code>http://localhost:5000</code></strong> in your browser to see your Worker node's live CPU/Thread load and the history of the DAG you just ran.</p>
+<p>To build and deploy a DAG visually, open <strong><code>http://localhost:5000/dags/new</code></strong>. See <a href="#4-open-the-dashboard">Step 4</a> above for full instructions.</p>
 <blockquote>
 <p>This is an external dependency and you will need to install Flask alone for this to work. This is not part of the engine and is an extension so its an external dependency.</p>
 </blockquote>
