@@ -110,7 +110,31 @@ python titan_sdk/titan_cli.py deploy titan_test_suite/examples/yaml_based_static
 ## 4. Open the Dashboard
 If you have flask installed (pip install flask), the titan-dev script automatically started the UI.
 
-Navigate to http://localhost:5000 in your browser to see your Worker node's live CPU/Thread load and the execution history of the DAG you just ran.
+Navigate to **`http://localhost:5000`** in your browser to see your Worker node's live CPU/Thread load and the execution history of the DAG you just ran.
+
+### DAG Visualizer
+
+Once a DAG has been submitted — via the CLI, Python SDK, YAML, or the Constructor — open the **DAG Pipelines** tab in the dashboard to see it rendered as a live graph. Node colors update in real-time as jobs move through `PENDING → RUNNING → COMPLETED / FAILED`.
+
+This works for any submission method. YAML and SDK-based pipelines are represented accurately with full structure. Dynamic DAGs are visualized based on the graph submitted to the Master at runtime. Agentic DAGs will appear and grow as the agent submits new work — the full graph may not be known upfront, but everything submitted will be visible.
+
+![DAG Visualizer](screenshots/DAG_Visualizer_.png)
+
+### Visual DAG Constructor
+
+Rather than writing YAML or SDK code, you can build and deploy pipelines directly from the browser.
+
+Open the DAG Constructor at **`http://localhost:5000/dags/new`**:
+
+1. **Add nodes** — each node represents a job. Set the Job ID, script filename, requirement (GENERAL / GPU), args, priority, and delay.
+2. **Draw edges** — click and drag from the output port of one node to the input port of another to define dependencies.
+3. **Deploy** — hit the **Deploy** button to submit the pipeline to the running cluster.
+
+The Constructor also auto-generates the equivalent **Python SDK** and **YAML** code in the output panel, which you can copy for reuse in automated pipelines.
+
+> **Note:** The Deploy button submits jobs by reading script files from the Master's `perm_files` directory by filename. Make sure any scripts you reference in the Constructor already exist in `perm_files` before clicking Deploy.
+
+![DAG Constructor](screenshots/DAG_Editor.png)
 
 ## 5. Advanced: Manual & IDE Setup
 
@@ -283,9 +307,9 @@ pip install -e .
 
 ---
 
-## 6. Run Your First Task
+## 6. Run Your First Task (Manual Setup)
 
-Let's deploy a pre-configured YAML DAG to the cluster using the Titan CLI.
+Once your cluster is up via the manual steps above, deploy the same YAML DAG:
 
 ```bash
 python titan_sdk/titan_cli.py deploy titan_test_suite/examples/yaml_based_static_tests/dag_structure_test/agent.yaml
@@ -310,6 +334,7 @@ python3 ./perm_files/server_dashboard.py
 
 Navigate to **`http://localhost:5000`** in your browser to see your Worker node's live CPU/Thread load and the history of the DAG you just ran.
 
+To build and deploy a DAG visually, open **`http://localhost:5000/dags/new`**. See [Step 4](#4-open-the-dashboard) above for full instructions.
 
 > This is an external dependency and you will need to install Flask alone for this to work. This is not part of the engine and is an extension so its an external dependency.
 

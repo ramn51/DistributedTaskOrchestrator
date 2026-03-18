@@ -16,6 +16,12 @@ It allows you to deploy standalone services, execute individual batch jobs, or d
 
 ![Titan Dashboard](screenshots/UI_Screenshot.png)
 
+### Live Pipeline Visibility — DAG Pipelines View
+
+Every pipeline submitted to the cluster — via CLI, SDK, YAML, or the visual Constructor — is automatically rendered as a live dependency graph with real-time execution status per node.
+
+![DAG Visualizer](screenshots/DAG_Visualizer_.png)
+
 ---
 
 ## What Titan Supports
@@ -92,6 +98,7 @@ flowchart LR
         SDK["Python SDK Agent"]
         YAML["YAML Pipeline"]
         Dash["Web Dashboard"]
+        Constructor["DAG Constructor UI"]
     end
 
     subgraph ControlPlane["Titan Control Plane"]
@@ -111,6 +118,7 @@ flowchart LR
 
     SDK -- "Submit Job" --> Master
     YAML -- "Submit Job" --> Master
+    Constructor -- "Submit Job" --> Master
 
     Master -- "Distribute" --> W1
     Master -- "Distribute" --> W2
@@ -163,9 +171,37 @@ Titan is designed to grow with your system's complexity:
 
 ## Built-In Dashboard
 Titan includes a lightweight Python Flask dashboard to visualize cluster health, monitor worker load, and stream stdout/stderr from distributed jobs in real-time.
+
+The dashboard also ships with two DAG-specific views: a **DAG Visualizer** for inspecting any running or completed pipeline, and a **DAG Constructor** for building and deploying new ones from the browser.
+
 > For the dashboard you will need Flask as external dependency (The core engine has zero dependencies, this is an extension)
 
 ![Titan Dashboard](screenshots/UI_Screenshot.png)
+
+### DAG Visualizer
+
+The DAG Pipelines view automatically renders a live graph of every pipeline that has been submitted to the cluster — regardless of how it was submitted. Whether a DAG was deployed via the CLI, the Python SDK, a YAML file, or the visual Constructor, it will appear here with its nodes, dependency edges, and real-time execution status.
+
+![DAG Visualizer](screenshots/DAG_Visualizer_.png)
+
+- **YAML and SDK-based DAGs** are represented accurately with full node and dependency structure.
+- **Dynamic DAGs** (flow-based, code-driven) are visualized based on the graph as submitted to the Master at runtime.
+- **Agentic DAGs** (where tasks spawn further tasks conditionally at runtime) will be visible based on what has been submitted so far — the graph will grow as the agent expands work, though the full future shape may not be known ahead of time.
+
+Node colors update live as jobs transition through `PENDING → RUNNING → COMPLETED / FAILED`, giving you a real-time view into pipeline progress without any manual refresh.
+
+For DAGs built and deployed via the visual Constructor, a **Redeploy** button appears directly in the pipeline view — re-submitting the full DAG to the cluster with a single click, without needing to revisit the Constructor or re-run any scripts.
+
+### Visual DAG Constructor
+
+Build and deploy pipelines without writing any code. Drag nodes onto the canvas, draw edges to define dependencies, configure each job's script, requirements, and priority — then hit **Deploy** to submit directly to the cluster.
+
+The Constructor also auto-generates the equivalent **Python SDK** and **YAML** definitions, which you can copy for reuse in automated pipelines.
+
+!!! note "Prerequisite"
+    The Deploy button submits jobs by reading script files from the Master's `perm_files` directory. Ensure the script files you reference in the Constructor have been created and staged to `perm_files` before deploying.
+
+![DAG Constructor Canvas](screenshots/DAG_Editor.png)
 
 ### Live Log streaming
 
@@ -217,6 +253,7 @@ Monitor remote worker execution directly from the control plane UI in real-time.
 The repository includes a comprehensive `titan_test_suite/` with ready-to-run examples demonstrating Titan's full range of capabilities:
 The examples are added as folders for each category,
 
+* **Visual DAG Builder:** Use the browser-based Constructor at `/dags/new` to drag-and-drop nodes, set dependencies, configure requirements, and deploy DAGs without writing any code. Auto-generates equivalent Python SDK and YAML definitions.
 * **MapReduce Data Processing:** A complete Python SDK implementation demonstrating how to fan-out data processing to parallel mappers and fan-in the results to a final reducer job. ([View the code on GitHub](https://github.com/ramn51/titan-orchestrator/blob/master/perm_files/pytests/static_dag_tests/map_reduce_test.py))
 * **Static YAML Pipelines:** Templates for basic Diamond Patterns, massive parallel Fan-outs, and strict hardware-aware routing (e.g., forcing tasks to `GPU` nodes).
 * **Dynamic Logic Switches:** Python SDK scripts that simulate measuring system traffic and dynamically spawn entirely different DAGs on the fly.
@@ -242,6 +279,7 @@ Looking for specific commands, methods, or internal engine documentation? Jump s
 
 Titan is actively evolving. Here are the major architectural milestones planned for upcoming releases. If you are looking for a high-impact way to contribute, these are our top priorities:
 
+- [x] **Visual DAG Constructor:** Browser-based drag-and-drop DAG editor with YAML/SDK code generation and one-click deploy.
 - [ ] **Distributed Consensus:** Implement Raft or Paxos for Leader Election to remove the Master node as a Single Point of Failure (SPOF).
 - [ ] **Security & Auth:** Implement mTLS (Mutual TLS) for encrypted, authenticated cluster communication.
 - [ ] **Containerized Execution:** Add support for Docker execution drivers to provide true filesystem isolation (currently utilizing Process-Level isolation).
