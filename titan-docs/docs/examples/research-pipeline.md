@@ -78,12 +78,13 @@ flowchart TD
 
 === "Worker scripts"
 
-    Two worker scripts are pre-staged in `perm_files/` — no extra setup needed:
+    Worker scripts live alongside the orchestrator — no extra setup needed:
 
     | Script | Purpose |
     |---|---|
-    | `perm_files/research_subtopic.py` | Calls Gemini to research one subtopic, stores result in TitanStore |
-    | `perm_files/synthesize_report.py` | Reads all subtopic results, calls Gemini for final synthesis |
+    | `research_pipeline/research_subtopic.py` | Calls Gemini to research one subtopic, stores result in TitanStore |
+    | `research_pipeline/synthesize_report.py` | Reads all subtopic results, calls Gemini for final synthesis |
+    | `research_pipeline/hitl_gate.py` | Pauses execution and waits for Dashboard Approve/Reject |
 
 ---
 

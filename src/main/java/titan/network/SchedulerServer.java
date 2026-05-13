@@ -488,6 +488,29 @@ import titan.network.TitanProtocol.TitanPacket;
                     return "UPLOAD_FAILED: " + e.getMessage();
                 }
 
+            case TitanProtocol.OP_DEPLOY_SCRIPT:
+                // Payload format: "FILENAME | BASE64_CONTENT"
+                // Writes the script to perm_files/ so the scheduler can find and execute it.
+                String deployParts[] = payload.split("\\|", 2);
+                if(deployParts.length < 2) return "ERROR: Invalid Deploy Payload";
+
+                String scriptName = deployParts[0];
+                String scriptData = deployParts[1];
+
+                try{
+                    File permDir = new File(PERM_FILES_DIR);
+                    if(!permDir.exists()) permDir.mkdirs();
+
+                    byte[] scriptBytes = Base64.getDecoder().decode(scriptData);
+                    File destScript = new File(permDir, scriptName);
+                    Files.write(destScript.toPath(), scriptBytes);
+                    System.out.println("[DEPLOY] Staged script: " + scriptName + " (" + scriptBytes.length + " bytes)");
+                    return "DEPLOY_SUCCESS";
+                }catch (Exception e) {
+                    e.printStackTrace();
+                    return "DEPLOY_FAILED: " + e.getMessage();
+                }
+
             case TitanProtocol.OP_FETCH_ASSET:
                 // Payload: "filename" (e.g., "my_project.zip")
                 String requestedFile = payload.trim();

@@ -110,6 +110,11 @@ import java.nio.charset.StandardCharsets;
  */
     public static final byte OP_FETCH_ASSET       = 0x54;
     /**
+ * OpCode for deploying a worker script to perm_files/ on the master.
+ * Used by orchestrators to stage worker scripts before DAG submission.
+ */
+    public static final byte OP_DEPLOY_SCRIPT     = 0x57;
+    /**
  * OpCode for sending a batch of log entries.
  */
     public static final byte OP_LOG_BATCH        = 0x17;

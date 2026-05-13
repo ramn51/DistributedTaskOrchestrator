@@ -24,7 +24,8 @@ VERSION = 1
 OP_SUBMIT_DAG = 4
 OP_LOG_BATCH = 0x17
 OP_GET_LOGS = 0x16
-OP_UPLOAD_ASSET = 0x53
+OP_UPLOAD_ASSET  = 0x53
+OP_DEPLOY_SCRIPT = 0x57
 OP_KV_SET = 0x60
 OP_KV_GET = 0x61
 OP_KV_SADD = 0x62
@@ -300,6 +301,32 @@ class TitanClient:
             return False
         target = save_path or f"/tmp/{filename}"
         return self.fetch_artifact(filename, save_path=target)
+
+    def deploy_script(self, filepath):
+        """Deploy a worker script to perm_files/ on the master.
+
+        Call this from an orchestrator before submitting a DAG that references
+        the script by filename. After deployment the master's scheduler can
+        locate the script via its normal perm_files/ scan.
+
+        Usage:
+            client.deploy_script("workers/my_worker.py")
+            TitanJob(job_id="...", filename="my_worker.py", ...)
+
+        Returns "DEPLOY_SUCCESS" on success, an error string otherwise.
+        """
+        if not os.path.exists(filepath):
+            return f"ERROR: File not found at: {filepath}"
+
+        real_path = os.path.abspath(filepath)
+        clean_filename = os.path.basename(real_path)
+        print(f"[SDK] Deploying script: {clean_filename}...")
+
+        with open(real_path, 'rb') as f:
+            b64_content = base64.b64encode(f.read()).decode('utf-8')
+
+        payload = f"{clean_filename}|{b64_content}"
+        return self._send_request(OP_DEPLOY_SCRIPT, payload)
 
     def upload_file(self, filepath):
         """Uploads a single file to master's uploads/ directory."""

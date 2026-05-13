@@ -83,14 +83,12 @@ flowchart LR
 ## File Structure
 
 ```
-perm_files/
+titan_test_suite/examples/agents_examples/research_agent/
+├── research_agent.py         # Orchestrator — holds the agentic while loop
 ├── research_planner.py       # Calls Gemini to break query into subtopics
 ├── research_worker.py        # Calls Gemini to research one subtopic
 ├── research_evaluator.py     # Calls Gemini to decide SYNTHESIZE or DEEPEN
 └── research_synthesizer.py   # Calls Gemini to write the final report
-
-titan_test_suite/examples/agents_examples/research_agent/
-└── research_agent.py         # Orchestrator — holds the agentic while loop
 ```
 
 ---

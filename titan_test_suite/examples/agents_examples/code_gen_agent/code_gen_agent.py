@@ -48,15 +48,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── Locate perm_files ──────────────────────────────────────────────────────────
-_HERE       = os.path.dirname(os.path.abspath(__file__))
-_ROOT       = os.path.abspath(os.path.join(_HERE, "..", "..", "..", ".."))
-_PERM_FILES = os.path.join(_ROOT, "perm_files")
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.abspath(os.path.join(_HERE, "..", "..", "..", ".."))
 
-_PLANNER    = os.path.join(_PERM_FILES, "code_planner.py")
-_GENERATOR  = os.path.join(_PERM_FILES, "code_generator.py")
-_REVIEWER   = os.path.join(_PERM_FILES, "code_reviewer.py")
-_FIXER      = os.path.join(_PERM_FILES, "code_fixer.py")
-_INTEGRATOR = os.path.join(_PERM_FILES, "code_integrator.py")
+# Worker scripts live alongside this orchestrator
+_PLANNER    = os.path.join(_HERE, "code_planner.py")
+_GENERATOR  = os.path.join(_HERE, "code_generator.py")
+_REVIEWER   = os.path.join(_HERE, "code_reviewer.py")
+_FIXER      = os.path.join(_HERE, "code_fixer.py")
+_INTEGRATOR = os.path.join(_HERE, "code_integrator.py")
 
 for _path in [_PLANNER, _GENERATOR, _REVIEWER, _FIXER, _INTEGRATOR]:
     if not os.path.exists(_path):
@@ -125,6 +125,7 @@ def run_agent(goal: str, max_iterations: int = MAX_ITERATIONS):
     print("=" * 60)
     print()
 
+    # ── Stage 1: Planner ──────────────────────────────────────────────────────
     # ── Stage 1: Planner ──────────────────────────────────────────────────────
     print("[AGENT] Stage 1 — Planner: decomposing goal into components...", flush=True)
 

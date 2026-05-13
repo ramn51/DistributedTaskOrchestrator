@@ -11,7 +11,7 @@
       
       
       
-        <link rel="prev" href="../dagster/">
+        <link rel="prev" href="../quickstart-agent/">
       
       
         <link rel="next" href="../code-gen-agent/">
@@ -724,6 +724,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart-agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build Your First Agent (10 min)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -809,10 +837,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#coordination-titanstore-shared-files" class="md-nav__link">
+  <a href="#coordination-titanstore-file-transfer" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Coordination: TitanStore + Shared Files
+        Coordination: TitanStore + File Transfer
       
     </span>
   </a>
@@ -1366,10 +1394,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#coordination-titanstore-shared-files" class="md-nav__link">
+  <a href="#coordination-titanstore-file-transfer" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Coordination: TitanStore + Shared Files
+        Coordination: TitanStore + File Transfer
       
     </span>
   </a>
@@ -1515,154 +1543,164 @@
 </table>
 <hr />
 <h2 id="architecture">Architecture</h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>User Query
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    │
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    ▼
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>┌─────────────────────────────────────────────────────┐
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│  Planner (Gemini)                                   │
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│  Breaks query into 4 focused subtopics              │
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│  Writes → shared/research_&lt;run_id&gt;_plan.json        │
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│  Signals → TitanStore: research:&lt;id&gt;:planner:done   │
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>└─────────────────────────────────────────────────────┘
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    │  submit_dag(researcher-0 ... researcher-N)
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    ▼
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>┌─────────────────────────────────────────────────────┐
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│  Researcher-0  Researcher-1  Researcher-2  ...      │
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│  (parallel, one per subtopic)                       │
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│  Each calls Gemini for ~250 word deep-dive          │
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│  Writes → shared/research_&lt;run_id&gt;_result_i.txt     │
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>│  Signals → TitanStore: research:&lt;id&gt;:researcher:i   │
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>└─────────────────────────────────────────────────────┘
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    │  (all complete)
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>    ▼
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>┌─────────────────────────────────────────────────────┐
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>│  Evaluator (Gemini)                — THE AGENT STEP │
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>│  Reads ALL researcher results                       │
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>│  Asks: &quot;Is this research complete enough?&quot;          │
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>│                                                     │
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>│  Decision A → SYNTHESIZE                            │
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>│    Writes eval JSON, signals TitanStore             │
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>│    Orchestrator breaks out of loop                  │
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>│                                                     │
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>│  Decision B → DEEPEN + gaps: [&quot;X&quot;, &quot;Y&quot;]             │
-</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>│    Orchestrator spawns follow-up researchers        │
-</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>│    Loop repeats with gap topics as new subtopics    │
-</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>└─────────────────────────────────────────────────────┘
-</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>    │  (if SYNTHESIZE)
-</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>    ▼
-</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>┌─────────────────────────────────────────────────────┐
-</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>│  Synthesizer (Gemini)                               │
-</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>│  Reads ALL result files (all iterations)            │
-</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>│  Writes final report → shared/research_&lt;id&gt;_report  │
-</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>│  Structure: Executive Summary / Key Findings /      │
-</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>│             Deep Dive / Recommendations /           │
-</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>│             Open Questions                          │
-</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>└─────────────────────────────────────────────────────┘
-</span></code></pre></div>
+<pre class="mermaid"><code>flowchart LR
+    Query(["User Query"]):::input
+
+    P["Planner\nGemini\nplan.json\nTitanStore signal"]
+
+    subgraph ITER["Parallel Researchers"]
+        direction TB
+        R0["Researcher-0"]
+        R1["Researcher-1"]
+        R2["Researcher-2"]
+        R3["Researcher-3"]
+        R0 ~~~ R1 ~~~ R2 ~~~ R3
+    end
+
+    E{"Evaluator\nGemini\nSYNTHESIZE or\nDEEPEN"}
+
+    S["Synthesizer\nGemini\nreport.md"]
+    Out(["research_report.md"]):::output
+
+    Query --&gt; P
+    P --&gt;|"submit_dag"| ITER
+    ITER --&gt;|"TitanStore signals"| E
+    E --&gt;|"SYNTHESIZE"| S
+    E --&gt;|"DEEPEN gaps"| ITER
+    S --&gt; Out
+
+    classDef input  fill:#1a3a1a,stroke:#4caf50,color:#a5d6a7
+    classDef output fill:#1a2a3a,stroke:#64b5f6,color:#90caf9</code></pre>
 <hr />
-<h2 id="coordination-titanstore-shared-files">Coordination: TitanStore + Shared Files</h2>
-<p>This example demonstrates the correct separation of concerns:</p>
+<h2 id="coordination-titanstore-file-transfer">Coordination: TitanStore + File Transfer</h2>
+<p>Three layers, each with a distinct role:</p>
 <table>
 <thead>
 <tr>
 <th>Layer</th>
-<th>Used for</th>
+<th>What's stored</th>
+<th>Who reads it</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>TitanStore</strong></td>
-<td>Completion signals — lightweight key set per stage (<code>research:{run_id}:planner:done</code>, <code>researcher:{iter}:{i}:done</code>, <code>eval:{iter}:done</code>, <code>synth:done</code>)</td>
+<td><strong>TitanStore (KV)</strong></td>
+<td>Completion signals, plan JSON, eval decisions, result file basenames, report basename</td>
+<td>All workers + orchestrator</td>
 </tr>
 <tr>
-<td><strong>Shared filesystem</strong></td>
-<td>Data payloads — <code>plan.json</code>, <code>result_*.txt</code>, <code>eval_*.json</code>, <code>report.md</code></td>
+<td><strong>Worker-local workspace</strong></td>
+<td><code>result_{iter}_{idx}.txt</code>, <code>report.md</code> — written to <code>titan_workspace/shared</code> on the worker node</td>
+<td>Uploaded immediately after write</td>
+</tr>
+<tr>
+<td><strong>Master <code>uploads/</code></strong></td>
+<td>Uploaded result and report files — served via <code>OP_FETCH_ASSET</code></td>
+<td>Evaluator, synthesizer, orchestrator</td>
 </tr>
 </tbody>
 </table>
-<p>The orchestrator polls TitanStore keys instead of watching the filesystem. Workers write their data file first, then signal TitanStore. TitanStore is the coordination bus; files are the data store.</p>
+<div class="admonition warning">
+<p class="admonition-title">titan_workspace/shared is local to the worker node</p>
+<p><code>titan_workspace/shared</code> is the CWD for all DAG worker scripts — but it exists <strong>on the worker node</strong>, not on the master. In a distributed deployment the orchestrator and other workers on different machines cannot access it directly. Workers call <code>publish_artifact(key, filename)</code> to upload to the master's <code>uploads/</code> directory and register the file under a TitanStore key. The orchestrator calls <code>get_artifact(key, save_path=...)</code> to download it. TitanStore is the only layer all nodes share in real time.</p>
+</div>
+<pre class="mermaid"><code>flowchart LR
+    subgraph WN["Worker Node"]
+        R["result_1_0.txt\nreport.md\n(titan_workspace/shared)"]
+    end
+    subgraph MN["Master Node"]
+        U["uploads/"]
+    end
+    Orch["Orchestrator\n/tmp/"]
+
+    R --&gt;|"publish_artifact()"| U
+    U --&gt;|"get_artifact()"| Orch</code></pre>
 <hr />
 <h2 id="file-structure">File Structure</h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>perm_files/
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── research_planner.py       # Calls Gemini to break query into subtopics
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├── research_worker.py        # Calls Gemini to research one subtopic
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>├── research_evaluator.py     # Calls Gemini to decide SYNTHESIZE or DEEPEN
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>└── research_synthesizer.py   # Calls Gemini to write the final report
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>titan_test_suite/examples/agents_examples/research_agent/
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>└── research_agent.py         # Orchestrator — holds the agentic while loop
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>titan_test_suite/examples/agents_examples/research_agent/
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── research_agent.py         # Orchestrator — holds the agentic while loop
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├── research_planner.py       # Calls Gemini to break query into subtopics
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>├── research_worker.py        # Calls Gemini to research one subtopic
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>├── research_evaluator.py     # Calls Gemini to decide SYNTHESIZE or DEEPEN
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>└── research_synthesizer.py   # Calls Gemini to write the final report
 </span></code></pre></div>
 <hr />
 <h2 id="agentic-loop-orchestrator">Agentic Loop (Orchestrator)</h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Stage 1: Planner — decides what to research</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="s2">&quot;PLAN&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">planner_job</span><span class="p">])</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">wait_for_signal</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;research:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:planner:done&quot;</span><span class="p">)</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">subtopics</span> <span class="o">=</span> <span class="n">read_json</span><span class="p">(</span><span class="n">plan_file</span><span class="p">)[</span><span class="s2">&quot;subtopics&quot;</span><span class="p">]</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="k">while</span> <span class="n">iteration</span> <span class="o">&lt;</span> <span class="n">max_iterations</span><span class="p">:</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">iteration</span> <span class="o">+=</span> <span class="mi">1</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="c1"># Stage 2: Parallel researchers — one per subtopic</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ITER</span><span class="si">{</span><span class="n">iteration</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">researcher_jobs</span><span class="p">)</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="n">wait_for_signals</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">researcher_signal_keys</span><span class="p">)</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="c1"># Stage 3: Evaluator — THE AGENTIC DECISION</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;EVAL</span><span class="si">{</span><span class="n">iteration</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">evaluator_job</span><span class="p">])</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="n">wait_for_signal</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;research:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:eval:</span><span class="si">{</span><span class="n">iteration</span><span class="si">}</span><span class="s2">:done&quot;</span><span class="p">)</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>    <span class="n">decision</span> <span class="o">=</span> <span class="n">read_json</span><span class="p">(</span><span class="n">eval_file</span><span class="p">)</span>
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>    <span class="k">if</span> <span class="n">decision</span><span class="p">[</span><span class="s2">&quot;decision&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;SYNTHESIZE&quot;</span><span class="p">:</span>
-</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>        <span class="k">break</span>                              <span class="c1"># ← LLM says we&#39;re done</span>
-</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>    <span class="k">else</span><span class="p">:</span>
-</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>        <span class="n">subtopics</span> <span class="o">=</span> <span class="n">decision</span><span class="p">[</span><span class="s2">&quot;gaps&quot;</span><span class="p">]</span>       <span class="c1"># ← LLM says go deeper</span>
-</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>
-</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="c1"># Stage 4: Synthesizer — merges everything into a final report</span>
-</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="s2">&quot;SYNTH&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">synthesizer_job</span><span class="p">])</span>
-</span><span id="__span-2-25"><a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="n">wait_for_signal</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;research:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:synth:done&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Stage 1: Planner — decides what to research</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="s2">&quot;PLAN&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">planner_job</span><span class="p">],</span> <span class="n">agent_run_id</span><span class="o">=</span><span class="n">run_id</span><span class="p">)</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">wait_for_signal</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;research:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:planner:done&quot;</span><span class="p">)</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Plan JSON stored in TitanStore by the planner — no file read needed</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">plan</span>      <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">store_get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;research:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:plan&quot;</span><span class="p">))</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">subtopics</span> <span class="o">=</span> <span class="n">plan</span><span class="p">[</span><span class="s2">&quot;subtopics&quot;</span><span class="p">]</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="k">while</span> <span class="n">iteration</span> <span class="o">&lt;</span> <span class="n">max_iterations</span><span class="p">:</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">iteration</span> <span class="o">+=</span> <span class="mi">1</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="c1"># Stage 2: Parallel researchers — one per subtopic</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ITER</span><span class="si">{</span><span class="n">iteration</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">researcher_jobs</span><span class="p">,</span> <span class="n">agent_run_id</span><span class="o">=</span><span class="n">run_id</span><span class="p">)</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="n">wait_for_signals</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">researcher_signal_keys</span><span class="p">)</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="c1"># Stage 3: Evaluator — THE AGENTIC DECISION</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;EVAL</span><span class="si">{</span><span class="n">iteration</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">evaluator_job</span><span class="p">],</span> <span class="n">agent_run_id</span><span class="o">=</span><span class="n">run_id</span><span class="p">)</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    <span class="n">wait_for_signal</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;research:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:eval:</span><span class="si">{</span><span class="n">iteration</span><span class="si">}</span><span class="s2">:done&quot;</span><span class="p">)</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    <span class="c1"># Eval decision stored in TitanStore by the evaluator</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    <span class="n">decision</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">store_get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;research:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:eval:</span><span class="si">{</span><span class="n">iteration</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">))</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>    <span class="k">if</span> <span class="n">decision</span><span class="p">[</span><span class="s2">&quot;decision&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;SYNTHESIZE&quot;</span><span class="p">:</span>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>        <span class="k">break</span>                              <span class="c1"># ← LLM says we&#39;re done</span>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>    <span class="k">else</span><span class="p">:</span>
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>        <span class="n">subtopics</span> <span class="o">=</span> <span class="n">decision</span><span class="p">[</span><span class="s2">&quot;gaps&quot;</span><span class="p">]</span>       <span class="c1"># ← LLM says go deeper</span>
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>
+</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="c1"># Stage 4: Synthesizer — merges everything into a final report</span>
+</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="s2">&quot;SYNTH&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">synthesizer_job</span><span class="p">],</span> <span class="n">agent_run_id</span><span class="o">=</span><span class="n">run_id</span><span class="p">)</span>
+</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="n">wait_for_signal</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;research:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:synth:done&quot;</span><span class="p">)</span>
+</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>
+</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="c1"># Download report published by synthesizer</span>
+</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="n">client</span><span class="o">.</span><span class="n">get_artifact</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;research:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:report&quot;</span><span class="p">,</span> <span class="n">save_path</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;/tmp/research_</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">_report.md&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <p>The <code>while</code> loop lives in the orchestrator, not in any DAG. Titan handles parallel execution of each iteration. The LLM drives when to stop.</p>
 <hr />
 <h2 id="running-it">Running It</h2>
 <p><strong>Prerequisites</strong></p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span>google-genai<span class="w"> </span>python-dotenv
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pip<span class="w"> </span>install<span class="w"> </span>google-genai<span class="w"> </span>python-dotenv
 </span></code></pre></div>
 <p>Add to <code>.env</code> at the project root:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>GEMINI_API_KEY=your_key_here
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>GEMINI_API_KEY=your_key_here
 </span></code></pre></div>
 <p><strong>Run</strong></p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Default query</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>python<span class="w"> </span>titan_test_suite/examples/agents_examples/research_agent/research_agent.py
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Custom query</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>python<span class="w"> </span>titan_test_suite/examples/agents_examples/research_agent/research_agent.py<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="s2">&quot;What are the tradeoffs of vector databases for production RAG systems?&quot;</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="c1"># Limit iterations</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>python<span class="w"> </span>titan_test_suite/examples/agents_examples/research_agent/research_agent.py<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">  </span><span class="s2">&quot;How does LoRA work for LLM fine-tuning?&quot;</span><span class="w"> </span>--max-iter<span class="w"> </span><span class="m">2</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Default query</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>python<span class="w"> </span>titan_test_suite/examples/agents_examples/research_agent/research_agent.py
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Custom query</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>python<span class="w"> </span>titan_test_suite/examples/agents_examples/research_agent/research_agent.py<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="s2">&quot;What are the tradeoffs of vector databases for production RAG systems?&quot;</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="c1"># Limit iterations</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>python<span class="w"> </span>titan_test_suite/examples/agents_examples/research_agent/research_agent.py<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">  </span><span class="s2">&quot;How does LoRA work for LLM fine-tuning?&quot;</span><span class="w"> </span>--max-iter<span class="w"> </span><span class="m">2</span>
 </span></code></pre></div>
 <hr />
 <h2 id="example-run-output">Example Run Output</h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>[AGENT] Stage 1 — Planner: breaking query into subtopics...
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>[AGENT]   planner — done
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>[AGENT] Planner decided 4 subtopics:
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>  [0] Performance, Scalability, and Latency Implications
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>  [1] Cost, Infrastructure, and Operational Overhead
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>  [2] Retrieval Quality, Relevance, and Embedding Management
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>  [3] Data Consistency, Freshness, and Integration Challenges
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>[AGENT] Iteration 1/3 — 4 subtopic(s)
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>[AGENT]   Submitted 4 researcher(s) in parallel...
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>[AGENT]   researcher-1-0 — done
-</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>[AGENT]   researcher-1-3 — done    ← out of order: truly parallel
-</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>[AGENT]   researcher-1-1 — done
-</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>[AGENT]   researcher-1-2 — done
-</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>[AGENT]   evaluator-1 — done
-</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>[AGENT]   Evaluator: research complete — proceeding to synthesis.
-</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>
-</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>[AGENT] Stage 4 — Synthesizer: merging 4 research sections...
-</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>[AGENT]   synthesizer — done
-</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>[AGENT] Done. Report saved → titan_workspace/shared/research_&lt;id&gt;_report.md
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>[AGENT] Stage 1 — Planner: breaking query into subtopics...
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>[AGENT]   planner — done
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>[AGENT] Planner decided 4 subtopics:
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>  [0] Performance, Scalability, and Latency Implications
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>  [1] Cost, Infrastructure, and Operational Overhead
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>  [2] Retrieval Quality, Relevance, and Embedding Management
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>  [3] Data Consistency, Freshness, and Integration Challenges
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>[AGENT] Iteration 1/3 — 4 subtopic(s)
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>[AGENT]   Submitted 4 researcher(s) in parallel...
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>[AGENT]   researcher-1-0 — done
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>[AGENT]   researcher-1-3 — done    ← out of order: truly parallel
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>[AGENT]   researcher-1-1 — done
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>[AGENT]   researcher-1-2 — done
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>[AGENT]   evaluator-1 — done
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>[AGENT]   Evaluator: research complete — proceeding to synthesis.
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>[AGENT] Stage 4 — Synthesizer: merging 4 research sections...
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>[AGENT]   synthesizer — done
+</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>[AGENT] Done. Report downloaded → /tmp/research_&lt;id&gt;_report.md
 </span></code></pre></div>
 <p>The researchers complete out of order because they run in parallel — each signals TitanStore independently as soon as Gemini responds.</p>
 <hr />

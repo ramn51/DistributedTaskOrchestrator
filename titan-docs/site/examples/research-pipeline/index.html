@@ -727,6 +727,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../quickstart-agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build Your First Agent (10 min)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../research-agent/" class="md-nav__link">
         
   
@@ -1631,17 +1659,17 @@
 
 <h1 id="multi-agent-research-pipeline">Multi-Agent Research Pipeline</h1>
 <p>This example shows a <strong>complete agentic workflow</strong> built on Titan — the kind that is awkward or impossible to express in static DAG tools like Airflow or Prefect.</p>
-<p>A research topic is broken into subtopics at runtime. Parallel Claude agents research each subtopic independently on the distributed cluster. A human reviews before the final synthesis runs. The result is a polished Markdown report generated entirely by the agent network.</p>
+<p>A research topic is broken into subtopics at runtime. Parallel Gemini agents research each subtopic independently on the distributed cluster. A human reviews before the final synthesis runs. The result is a polished Markdown report generated entirely by the agent network.</p>
 <pre class="mermaid"><code>flowchart TD
     O["🐍 research_pipeline.py\n(Orchestrator — your machine)"]
 
     O --&gt;|"Writes config to TitanStore\n(topic, subtopics, run_id)"| KV[("TitanStore")]
     O --&gt;|"submit_dag()"| M["Titan Master"]
 
-    M --&gt; R0["research-0\nclaude-sonnet-4-6\nSubtopic 0"]
-    M --&gt; R1["research-1\nclaude-sonnet-4-6\nSubtopic 1"]
-    M --&gt; R2["research-2\nclaude-sonnet-4-6\nSubtopic 2"]
-    M --&gt; R3["research-3\nclaude-sonnet-4-6\nSubtopic 3"]
+    M --&gt; R0["research-0\ngemini-2.5-flash\nSubtopic 0"]
+    M --&gt; R1["research-1\ngemini-2.5-flash\nSubtopic 1"]
+    M --&gt; R2["research-2\ngemini-2.5-flash\nSubtopic 2"]
+    M --&gt; R3["research-3\ngemini-2.5-flash\nSubtopic 3"]
 
     R0 --&gt;|"Writes result to KV"| KV
     R1 --&gt;|"Writes result to KV"| KV
@@ -1653,7 +1681,7 @@
     R2 --&gt; GATE
     R3 --&gt; GATE
 
-    GATE --&gt;|"Human: Approve ✅"| S["synthesize\nclaude-opus-4-6\nFan-in synthesis"]
+    GATE --&gt;|"Human: Approve ✅"| S["synthesize\ngemini-2.5-flash\nFan-in synthesis"]
     GATE --&gt;|"Human: Reject ❌"| STOP["Pipeline halted"]
 
     S --&gt;|"Reads all results from KV"| KV
@@ -1702,7 +1730,7 @@
 </tr>
 <tr>
 <td><strong>Live log streaming</strong></td>
-<td>Each Claude response streams to the Dashboard log viewer in real time</td>
+<td>Each Gemini response streams to the Dashboard log viewer in real time</td>
 </tr>
 <tr>
 <td><strong>Capability routing</strong></td>
@@ -1714,23 +1742,24 @@
 <h2 id="prerequisites">Prerequisites</h2>
 <p>=== "Install"</p>
 <div class="language-text highlight"><pre><span></span><code>```bash
-# 1. Anthropic SDK — needed on every worker node
-pip install anthropic
+# 1. Gemini SDK — needed on every worker node
+pip install google-genai python-dotenv
 
 # 2. Set your API key in the environment
-export ANTHROPIC_API_KEY=&quot;sk-ant-...&quot;
+export GEMINI_API_KEY=&quot;your_key_here&quot;
 
 # 3. Make sure Titan is running
 ./titan-dev up
 ```
 </code></pre></div>
 <p>=== "Worker scripts"</p>
-<div class="language-text highlight"><pre><span></span><code>Two worker scripts are pre-staged in `perm_files/` — no extra setup needed:
+<div class="language-text highlight"><pre><span></span><code>Worker scripts live alongside the orchestrator — no extra setup needed:
 
 | Script | Purpose |
 |---|---|
-| `perm_files/research_subtopic.py` | Calls Claude Sonnet to research one subtopic, stores result in TitanStore |
-| `perm_files/synthesize_report.py` | Reads all subtopic results, calls Claude Opus for final synthesis |
+| `research_pipeline/research_subtopic.py` | Calls Gemini to research one subtopic, stores result in TitanStore |
+| `research_pipeline/synthesize_report.py` | Reads all subtopic results, calls Gemini for final synthesis |
+| `research_pipeline/hitl_gate.py` | Pauses execution and waits for Dashboard Approve/Reject |
 </code></pre></div>
 <hr />
 <h2 id="quick-start">Quick Start</h2>
@@ -1751,10 +1780,10 @@ export ANTHROPIC_API_KEY=&quot;sk-ant-...&quot;
 <h2 id="what-happens-step-by-step">What Happens Step by Step</h2>
 <h3 id="1-orchestrator-stores-config-in-titanstore">1. Orchestrator stores config in TitanStore</h3>
 <p>Before submitting the DAG, the orchestrator writes the research config into TitanStore so every worker can read it — even across different machines:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">_titan_kv_set</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;titan:research:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:topic&quot;</span><span class="p">,</span>       <span class="n">topic</span><span class="p">)</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">_titan_kv_set</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;titan:research:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:count&quot;</span><span class="p">,</span>        <span class="nb">str</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">subtopics</span><span class="p">)))</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">_titan_kv_set</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;titan:research:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:subtopic:0&quot;</span><span class="p">,</span>  <span class="n">subtopics</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">_titan_kv_set</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;titan:research:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:subtopic:1&quot;</span><span class="p">,</span>  <span class="n">subtopics</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">client</span><span class="o">.</span><span class="n">store_put</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;titan:research:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:topic&quot;</span><span class="p">,</span>      <span class="n">topic</span><span class="p">)</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">client</span><span class="o">.</span><span class="n">store_put</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;titan:research:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:count&quot;</span><span class="p">,</span>       <span class="nb">str</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">subtopics</span><span class="p">)))</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">client</span><span class="o">.</span><span class="n">store_put</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;titan:research:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:subtopic:0&quot;</span><span class="p">,</span> <span class="n">subtopics</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">client</span><span class="o">.</span><span class="n">store_put</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;titan:research:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:subtopic:1&quot;</span><span class="p">,</span> <span class="n">subtopics</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># ... etc</span>
 </span></code></pre></div>
 <p>Each worker reads its assigned subtopic from this key rather than receiving it in args — this avoids shell-quoting issues with complex text.</p>
@@ -1818,7 +1847,7 @@ export ANTHROPIC_API_KEY=&quot;sk-ant-...&quot;
 <li>Reads all subtopic results from TitanStore</li>
 <li>Combines them into a structured prompt for Claude Opus</li>
 <li>Generates a full professional report: Executive Summary → Key Findings → Analysis → Conclusion</li>
-<li>Writes the report to a <code>.md</code> file in the worker workspace</li>
+<li>Stores the final report in TitanStore at <code>titan:research:{run_id}:report</code></li>
 <li>Streams the full report to the Dashboard log viewer</li>
 </ol>
 <hr />

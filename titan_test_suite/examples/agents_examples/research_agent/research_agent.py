@@ -45,14 +45,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── Locate perm_files ──────────────────────────────────────────────────────────
-_HERE       = os.path.dirname(os.path.abspath(__file__))
-_ROOT       = os.path.abspath(os.path.join(_HERE, "..", "..", "..", ".."))
-_PERM_FILES = os.path.join(_ROOT, "perm_files")
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.abspath(os.path.join(_HERE, "..", "..", "..", ".."))
 
-_PLANNER     = os.path.join(_PERM_FILES, "research_planner.py")
-_WORKER      = os.path.join(_PERM_FILES, "research_worker.py")
-_EVALUATOR   = os.path.join(_PERM_FILES, "research_evaluator.py")
-_SYNTHESIZER = os.path.join(_PERM_FILES, "research_synthesizer.py")
+# Worker scripts live alongside this orchestrator
+_PLANNER     = os.path.join(_HERE, "research_planner.py")
+_WORKER      = os.path.join(_HERE, "research_worker.py")
+_EVALUATOR   = os.path.join(_HERE, "research_evaluator.py")
+_SYNTHESIZER = os.path.join(_HERE, "research_synthesizer.py")
 
 for _path in [_PLANNER, _WORKER, _EVALUATOR, _SYNTHESIZER]:
     if not os.path.exists(_path):

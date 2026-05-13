@@ -727,6 +727,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../quickstart-agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build Your First Agent (10 min)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../research-agent/" class="md-nav__link">
         
   
@@ -837,10 +865,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#coordination-titanstore-shared-files" class="md-nav__link">
+  <a href="#coordination-titanstore-file-transfer" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Coordination: TitanStore + Shared Files
+        Coordination: TitanStore + File Transfer
       
     </span>
   </a>
@@ -1366,10 +1394,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#coordination-titanstore-shared-files" class="md-nav__link">
+  <a href="#coordination-titanstore-file-transfer" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Coordination: TitanStore + Shared Files
+        Coordination: TitanStore + File Transfer
       
     </span>
   </a>
@@ -1521,118 +1549,143 @@
 <p>Both share the same planner pattern — one LLM call to decompose the goal — but the loop condition, fix strategy, and output are fundamentally different.</p>
 <hr />
 <h2 id="architecture">Architecture</h2>
-<pre class="mermaid"><code>flowchart TD
+<pre class="mermaid"><code>flowchart LR
     Goal(["User Goal"]):::input
 
-    subgraph PLAN["Stage 1 — Planner"]
-        P["Planner\n(Gemini)\nDecomposes goal into 3-4 components\nWrites plan.json\nSignals TitanStore: planner:done"]
-    end
+    P["Planner\nGemini\nplan.json\nTitanStore signal"]
 
-    subgraph GEN["Stage 2 — Parallel Generators (one per component)"]
-        direction LR
-        G0["Generator-0\ncomponent_0.py"]
-        G1["Generator-1\ncomponent_1.py"]
-        G2["Generator-2\ncomponent_2.py"]
-    end
-
-    subgraph REVIEW_LOOP["Stage 3 — Review → Fix Loop (agentic)"]
+    subgraph GEN["Parallel Generators"]
         direction TB
-        R{"Reviewer\n(Gemini)\nReads ALL components\nChecks correctness &amp;amp;\ninterface compatibility"}
-        APPROVE(["APPROVE\n→ exit loop"]):::good
-        REQUEST["REQUEST_CHANGES\n+ issues list\n(only flagged components)"]:::warn
-
-        subgraph FIX["Targeted Fixers (parallel, only broken components)"]
-            direction LR
-            F0["Fixer-0\nfix component X"]
-            F1["Fixer-1\nfix component Y"]
-        end
-
-        R --&gt;|"decision = APPROVE"| APPROVE
-        R --&gt;|"decision = REQUEST_CHANGES"| REQUEST
-        REQUEST --&gt; FIX
-        FIX --&gt;|"loop back"| R
+        G0["Generator-0"]
+        G1["Generator-1"]
+        G2["Generator-2"]
+        G0 ~~~ G1 ~~~ G2
     end
 
-    subgraph INTEGRATE["Stage 4 — Integrator"]
-        I["Integrator\n(Gemini)\nMerges all components\nAdds main() entry point\nWrites final.py"]
+    R{"Reviewer\nGemini\nAPPROVE or\nREQUEST_CHANGES"}
+
+    subgraph FIX["Targeted Fixers only flagged"]
+        direction TB
+        F0["Fixer-0"]
+        F1["Fixer-1"]
+        F0 ~~~ F1
     end
 
-    Out(["code_final.py\n(runnable)"]):::output
+    I["Integrator\nGemini\nfinal.py"]
+    Out(["code_final.py"]):::output
 
-    Goal --&gt; PLAN
-    PLAN --&gt;|"submit_dag generators"| GEN
-    GEN --&gt;|"all done → TitanStore signals"| REVIEW_LOOP
-    APPROVE --&gt; INTEGRATE
-    INTEGRATE --&gt; Out
+    Goal --&gt; P
+    P --&gt;|"submit_dag"| GEN
+    GEN --&gt;|"TitanStore signals"| R
+    R --&gt;|"APPROVE"| I
+    R --&gt;|"REQUEST_CHANGES"| FIX
+    FIX --&gt;|"loop back"| R
+    I --&gt; Out
 
     classDef input  fill:#1a3a1a,stroke:#4caf50,color:#a5d6a7
-    classDef output fill:#1a2a3a,stroke:#64b5f6,color:#90caf9
-    classDef good   fill:#1b3a1b,stroke:#66bb6a,color:#a5d6a7
-    classDef warn   fill:#3a2a10,stroke:#ffa726,color:#ffcc80</code></pre>
+    classDef output fill:#1a2a3a,stroke:#64b5f6,color:#90caf9</code></pre>
 <hr />
-<h2 id="coordination-titanstore-shared-files">Coordination: TitanStore + Shared Files</h2>
+<h2 id="coordination-titanstore-file-transfer">Coordination: TitanStore + File Transfer</h2>
+<p>Three layers, each with a distinct role:</p>
 <table>
 <thead>
 <tr>
 <th>Layer</th>
-<th>Used for</th>
+<th>What's stored</th>
+<th>Who reads it</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>TitanStore</strong></td>
-<td>Completion signals per stage — <code>code:{run_id}:planner:done</code>, <code>generator:{iter}:{i}:done</code>, <code>reviewer:{iter}:done</code>, <code>fixer:{iter}:{issue}:done</code>, <code>integrator:done</code></td>
+<td><strong>TitanStore (KV)</strong></td>
+<td>Completion signals, plan JSON, component code content, review decisions, final file basename</td>
+<td>All workers + orchestrator</td>
 </tr>
 <tr>
-<td><strong>Shared files</strong></td>
-<td><code>plan.json</code>, <code>component_{i}.py</code> (overwritten by fixer), <code>review_{iter}.json</code>, <code>final.py</code></td>
+<td><strong>Worker-local workspace</strong></td>
+<td><code>final.py</code> — written to <code>titan_workspace/shared</code> on the worker node</td>
+<td>Uploaded after write</td>
+</tr>
+<tr>
+<td><strong>Master <code>uploads/</code></strong></td>
+<td>Uploaded final file — served via <code>OP_FETCH_ASSET</code></td>
+<td>Orchestrator</td>
 </tr>
 </tbody>
 </table>
-<p>The component files use a stable naming scheme — <code>component_{idx}.py</code> — so the fixer overwrites the same file the reviewer originally read. The reviewer always reads the latest version of each component regardless of iteration.</p>
+<p><strong>Component code lives entirely in TitanStore</strong> — generators write code directly to <code>code:{run_id}:component:{idx}:content</code>, the fixer overwrites the same key with the fixed version, the reviewer and integrator read from it. No file transfer between workers needed. Only the final integrated file is large enough to warrant <code>publish_artifact()</code> → <code>get_artifact()</code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">titan_workspace/shared is local to the worker node</p>
+<p><code>titan_workspace/shared</code> is the CWD for all DAG worker scripts — but it exists <strong>on the worker node</strong>, not on the master. In a distributed deployment the orchestrator cannot access it directly. The integrator calls <code>publish_artifact(key, filename)</code> to upload the final file to the master's <code>uploads/</code> directory; the orchestrator calls <code>get_artifact(key, save_path=...)</code> to download it.</p>
+</div>
+<pre class="mermaid"><code>flowchart LR
+    Gen["Generator"]
+    Fix["Fixer\n(overwrites same key)"]
+    Rev["Reviewer"]
+    Int["Integrator"]
+    TS[("TitanStore")]
+    WS["worker workspace"]
+    PM["master\nuploads/"]
+    Orch["Orchestrator"]
+
+    Gen --&gt;|"store_put\ncomponent:idx:content"| TS
+    Fix --&gt;|"store_put\ncomponent:idx:content"| TS
+    TS --&gt;|"store_get\ncomponent:idx:content"| Rev
+    TS --&gt;|"store_get\ncomponent:idx:content"| Int
+
+    Int --&gt;|"writes final.py"| WS
+    WS --&gt;|"publish_artifact()"| PM
+    PM --&gt;|"get_artifact()"| Orch</code></pre>
 <hr />
 <h2 id="file-structure">File Structure</h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>perm_files/
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── code_planner.py       # Decomposes goal into components
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├── code_generator.py     # Generates code for one component (reads plan.json)
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>├── code_reviewer.py      # Reviews all components: APPROVE or REQUEST_CHANGES
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>├── code_fixer.py         # Fixes one flagged component (targeted, minimal)
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>└── code_integrator.py    # Merges all components into final runnable file
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>titan_test_suite/examples/agents_examples/code_gen_agent/
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>└── code_gen_agent.py     # Orchestrator — holds the agentic while loop
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>titan_test_suite/examples/agents_examples/code_gen_agent/
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── code_gen_agent.py     # Orchestrator — holds the agentic while loop
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├── code_planner.py       # Decomposes goal into components
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>├── code_generator.py     # Generates code for one component (reads plan.json)
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>├── code_reviewer.py      # Reviews all components: APPROVE or REQUEST_CHANGES
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>├── code_fixer.py         # Fixes one flagged component (targeted, minimal)
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>└── code_integrator.py    # Merges all components into final runnable file
 </span></code></pre></div>
 <hr />
 <h2 id="agentic-loop-orchestrator">Agentic Loop (Orchestrator)</h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Stage 1: Planner — decomposes goal</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="s2">&quot;PLAN&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">planner_job</span><span class="p">],</span> <span class="n">agent_run_id</span><span class="o">=</span><span class="n">run_id</span><span class="p">)</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">wait_for_signal</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;code:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:planner:done&quot;</span><span class="p">)</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">components</span> <span class="o">=</span> <span class="n">read_json</span><span class="p">(</span><span class="n">plan_file</span><span class="p">)[</span><span class="s2">&quot;components&quot;</span><span class="p">]</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1"># Stage 2: Generate all components in parallel</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="s2">&quot;GEN1&quot;</span><span class="p">,</span> <span class="n">generator_jobs</span><span class="p">,</span> <span class="n">agent_run_id</span><span class="o">=</span><span class="n">run_id</span><span class="p">)</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">wait_for_signals</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">generator_signal_keys</span><span class="p">)</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># Stage 3: Review → fix loop</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="k">while</span> <span class="n">iteration</span> <span class="o">&lt;</span> <span class="n">max_iterations</span><span class="p">:</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;REVIEW</span><span class="si">{</span><span class="nb">iter</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">reviewer_job</span><span class="p">],</span> <span class="n">agent_run_id</span><span class="o">=</span><span class="n">run_id</span><span class="p">)</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="n">wait_for_signal</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;code:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:reviewer:</span><span class="si">{</span><span class="nb">iter</span><span class="si">}</span><span class="s2">:done&quot;</span><span class="p">)</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="n">review</span> <span class="o">=</span> <span class="n">read_json</span><span class="p">(</span><span class="n">review_file</span><span class="p">)</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="k">if</span> <span class="n">review</span><span class="p">[</span><span class="s2">&quot;decision&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;APPROVE&quot;</span><span class="p">:</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>        <span class="k">break</span>                             <span class="c1"># ← LLM says code is good</span>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    <span class="n">issues</span> <span class="o">=</span> <span class="n">review</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">]</span>            <span class="c1"># ← only flagged components</span>
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    <span class="n">fixer_jobs</span> <span class="o">=</span> <span class="p">[</span><span class="n">TitanJob</span> <span class="n">per</span> <span class="n">issue</span><span class="p">]</span>    <span class="c1"># ← targeted, not all components</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>    <span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;FIX</span><span class="si">{</span><span class="nb">iter</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fixer_jobs</span><span class="p">,</span> <span class="n">agent_run_id</span><span class="o">=</span><span class="n">run_id</span><span class="p">)</span>
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>    <span class="n">wait_for_signals</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">fixer_signal_keys</span><span class="p">)</span>
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>    <span class="n">iteration</span> <span class="o">+=</span> <span class="mi">1</span>
-</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>
-</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="c1"># Stage 4: Integrate — merge approved components</span>
-</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="s2">&quot;INTEGRATE&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">integrator_job</span><span class="p">],</span> <span class="n">agent_run_id</span><span class="o">=</span><span class="n">run_id</span><span class="p">)</span>
-</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="n">wait_for_signal</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;code:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:integrator:done&quot;</span><span class="p">)</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Plan JSON stored in TitanStore by the planner — no file read needed</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">plan</span>       <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">store_get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;code:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:plan&quot;</span><span class="p">))</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">components</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">plan</span><span class="p">[</span><span class="s2">&quot;components&quot;</span><span class="p">],</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">c</span><span class="p">:</span> <span class="n">c</span><span class="p">[</span><span class="s2">&quot;idx&quot;</span><span class="p">])</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="c1"># Stage 2: Generate all components in parallel</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="c1"># Each generator stores its code in TitanStore: code:{run_id}:component:{idx}:content</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="s2">&quot;GEN1&quot;</span><span class="p">,</span> <span class="n">generator_jobs</span><span class="p">,</span> <span class="n">agent_run_id</span><span class="o">=</span><span class="n">run_id</span><span class="p">)</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="n">wait_for_signals</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">generator_signal_keys</span><span class="p">)</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="c1"># Stage 3: Review → fix loop</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="k">while</span> <span class="n">iteration</span> <span class="o">&lt;</span> <span class="n">max_iterations</span><span class="p">:</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;REVIEW</span><span class="si">{</span><span class="n">iteration</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">reviewer_job</span><span class="p">],</span> <span class="n">agent_run_id</span><span class="o">=</span><span class="n">run_id</span><span class="p">)</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="n">wait_for_signal</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;code:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:reviewer:</span><span class="si">{</span><span class="n">iteration</span><span class="si">}</span><span class="s2">:done&quot;</span><span class="p">)</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>    <span class="c1"># Review decision stored in TitanStore by the reviewer</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    <span class="n">review</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">store_get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;code:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:review:</span><span class="si">{</span><span class="n">iteration</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">))</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    <span class="k">if</span> <span class="n">review</span><span class="p">[</span><span class="s2">&quot;decision&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;APPROVE&quot;</span><span class="p">:</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>        <span class="k">break</span>                             <span class="c1"># ← LLM says code is good</span>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>    <span class="n">issues</span> <span class="o">=</span> <span class="n">review</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">]</span>            <span class="c1"># ← only flagged components</span>
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>    <span class="n">fixer_jobs</span> <span class="o">=</span> <span class="p">[</span><span class="n">TitanJob</span> <span class="n">per</span> <span class="n">issue</span><span class="p">]</span>    <span class="c1"># ← targeted, not all components</span>
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>    <span class="c1"># Each fixer reads content from TitanStore, fixes it, writes back to same key</span>
+</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>    <span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;FIX</span><span class="si">{</span><span class="n">iteration</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fixer_jobs</span><span class="p">,</span> <span class="n">agent_run_id</span><span class="o">=</span><span class="n">run_id</span><span class="p">)</span>
+</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>    <span class="n">wait_for_signals</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">fixer_signal_keys</span><span class="p">)</span>
+</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>    <span class="n">iteration</span> <span class="o">+=</span> <span class="mi">1</span>
+</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>
+</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="c1"># Stage 4: Integrate — reads all component content from TitanStore,</span>
+</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="c1"># writes final.py, publishes to master</span>
+</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a><span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="s2">&quot;INTEGRATE&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">integrator_job</span><span class="p">],</span> <span class="n">agent_run_id</span><span class="o">=</span><span class="n">run_id</span><span class="p">)</span>
+</span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a><span class="n">wait_for_signal</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;code:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:integrator:done&quot;</span><span class="p">)</span>
+</span><span id="__span-1-34"><a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>
+</span><span id="__span-1-35"><a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a><span class="c1"># Download final file published by integrator</span>
+</span><span id="__span-1-36"><a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a><span class="n">client</span><span class="o">.</span><span class="n">get_artifact</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;code:</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">:final&quot;</span><span class="p">,</span> <span class="n">save_path</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;/tmp/code_</span><span class="si">{</span><span class="n">run_id</span><span class="si">}</span><span class="s2">_final.py&quot;</span><span class="p">)</span>
 </span></code></pre></div>
-<p><strong>Key difference from Research Agent:</strong> <code>fixer_jobs</code> only contains jobs for flagged components — not all components. If 1 of 4 components has an issue, only 1 fixer job is submitted. Titan's parallel execution still applies across multiple issues in the same fix round.</p>
+<p><strong>Key difference from Research Agent:</strong> <code>fixer_jobs</code> only contains jobs for flagged components — not all components. If 1 of 4 components has an issue, only 1 fixer job is submitted. The fixer overwrites the TitanStore key for that component — the reviewer on the next iteration reads the updated content automatically.</p>
 <hr />
 <h2 id="running-it">Running It</h2>
 <p><strong>Prerequisites</strong></p>
@@ -1681,7 +1734,7 @@
 </span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>
 </span><span id="__span-5-25"><a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>[AGENT] Stage 4 — Integrator: merging 3 approved component(s)...
 </span><span id="__span-5-26"><a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>[AGENT]   integrator — done
-</span><span id="__span-5-27"><a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>[AGENT] Done. Final code → titan_workspace/shared/code_&lt;id&gt;_final.py
+</span><span id="__span-5-27"><a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>[AGENT] Done. Final code downloaded → /tmp/code_&lt;id&gt;_final.py
 </span></code></pre></div>
 <p>Notice the reviewer found bugs in <code>cli_interface</code> only — the fixer ran twice for that one component while <code>task_core</code> and <code>json_persistence</code> were untouched.</p>
 <hr />

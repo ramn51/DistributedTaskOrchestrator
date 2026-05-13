@@ -39,16 +39,13 @@ import os
 import time
 import uuid
 
-# ── Locate perm_files relative to this script ─────────────────────────────────
-# Layout: titan_test_suite/examples/agents_examples/research_pipeline/
-#         → 4 levels up → project root → perm_files/
-_HERE      = os.path.dirname(os.path.abspath(__file__))
-_ROOT      = os.path.abspath(os.path.join(_HERE, "..", "..", "..", ".."))
-_PERM      = os.path.join(_ROOT, "perm_files")
+# Worker scripts live alongside this orchestrator
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.abspath(os.path.join(_HERE, "..", "..", "..", ".."))
 
-_RESEARCH_SCRIPT   = os.path.join(_PERM, "research_subtopic.py")
-_SYNTHESIZE_SCRIPT = os.path.join(_PERM, "synthesize_report.py")
-_HITL_GATE_SCRIPT  = os.path.join(_PERM, "hitl_gate.py")
+_RESEARCH_SCRIPT   = os.path.join(_HERE, "research_subtopic.py")
+_SYNTHESIZE_SCRIPT = os.path.join(_HERE, "synthesize_report.py")
+_HITL_GATE_SCRIPT  = os.path.join(_HERE, "hitl_gate.py")
 
 for _f in (_RESEARCH_SCRIPT, _SYNTHESIZE_SCRIPT, _HITL_GATE_SCRIPT):
     if not os.path.exists(_f):

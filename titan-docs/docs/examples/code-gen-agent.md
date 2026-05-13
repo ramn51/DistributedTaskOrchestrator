@@ -102,15 +102,13 @@ flowchart LR
 ## File Structure
 
 ```
-perm_files/
+titan_test_suite/examples/agents_examples/code_gen_agent/
+├── code_gen_agent.py     # Orchestrator — holds the agentic while loop
 ├── code_planner.py       # Decomposes goal into components
 ├── code_generator.py     # Generates code for one component (reads plan.json)
 ├── code_reviewer.py      # Reviews all components: APPROVE or REQUEST_CHANGES
 ├── code_fixer.py         # Fixes one flagged component (targeted, minimal)
 └── code_integrator.py    # Merges all components into final runnable file
-
-titan_test_suite/examples/agents_examples/code_gen_agent/
-└── code_gen_agent.py     # Orchestrator — holds the agentic while loop
 ```
 
 ---
