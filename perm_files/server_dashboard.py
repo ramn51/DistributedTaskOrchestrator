@@ -27,6 +27,7 @@ CURRENT_VERSION = 1
 OP_STATS_JSON      = 0x09
 OP_GET_LOGS        = 0x16
 OP_GET_JOB_STATUS  = 0x55
+OP_CANCEL_JOB      = 0x56
 OP_KV_SET          = 0x60
 OP_KV_GET          = 0x61
 OP_KV_SADD         = 0x62
@@ -144,7 +145,7 @@ def discover_dags_from_stats(stats):
         # When the same job appears multiple times in history (e.g. old COMPLETED
         # from a previous run AND a new DEAD from the current rejection), prefer
         # the higher-severity entry so a rejection always surfaces as FAILED.
-        _SEV = {"RUNNING": 5, "DEAD": 4, "FAILED": 4, "COMPLETED": 3, "WAITING": 2}
+        _SEV = {"RUNNING": 5, "DEAD": 4, "FAILED": 4, "CANCELLED": 4, "COMPLETED": 3, "WAITING": 2}
         for h in w.get("history", []):
             jid = h.get("id", "")
             if not jid:
@@ -293,6 +294,7 @@ DASHBOARD_HTML = SHARED_STYLE + """
   <a class="tab active" href="/">🖥 Orchestrator</a>
   <a class="tab" href="/dags">🔀 DAG Pipelines</a>
   <a class="tab" href="/dags/new">✏️ Constructor</a>
+  <a class="tab" href="/agents">🤖 Agent Runs</a>
   <div class="topnav-right">
     <span class="conn-dot" style="background:{{ status_color }}"></span>
     <span style="color:{{ status_color }}; font-weight:600;">{{ status_text }}</span>
@@ -427,6 +429,7 @@ DAG_DASHBOARD_HTML = SHARED_STYLE + """
   <a class="tab" href="/">🖥 Orchestrator</a>
   <a class="tab active" href="/dags">🔀 DAG Pipelines</a>
   <a class="tab" href="/dags/new">✏️ Constructor</a>
+  <a class="tab" href="/agents">🤖 Agent Runs</a>
   <div class="topnav-right">
     <span class="conn-dot" style="background:{{ status_color }}"></span>
     <span style="color:{{ status_color }}; font-weight:600;">{{ status_text }}</span>
@@ -475,6 +478,15 @@ DAG_DASHBOARD_HTML = SHARED_STYLE + """
           {% for req in selected_dag.requirements %}
             <span class="{% if req == 'GPU' %}req-gpu{% else %}req-gen{% endif %}">{{ req }}</span>
           {% endfor %}
+          {% if selected_dag.status in ('RUNNING', 'PENDING') %}
+          <button id="stop-dag-btn"
+            onclick="stopDag('{{ selected_dag.id }}')"
+            style="background:#1a0d0d; border:1px solid #ff525266; color:#ff7070;
+                   font-size:12px; padding:5px 14px; border-radius:6px; cursor:pointer;
+                   font-weight:600; transition:background .2s;">
+            ⬛ Stop
+          </button>
+          {% endif %}
           {% if selected_dag.can_redeploy %}
           <button id="redeploy-btn"
             onclick="redeployDag('{{ selected_dag.id }}')"
@@ -533,6 +545,13 @@ DAG_DASHBOARD_HTML = SHARED_STYLE + """
             {% endif %}
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
+            {% if selected_job.status in ('RUNNING', 'WAITING', 'PENDING') %}
+            <button id="stop-job-btn"
+              onclick="stopJob('{{ selected_job.id }}')"
+              style="background:#1a0d0d; border:1px solid #ff525255; color:#ff7070; padding:4px 12px; border-radius:6px; cursor:pointer; font-size:12px;">
+              ⬛ Stop
+            </button>
+            {% endif %}
             <button id="replay-btn"
               onclick="replayJob('{{ selected_job.id }}')"
               style="background:#0d0d14; border:1px solid #2a2a2a; color:#aaa; padding:4px 12px; border-radius:6px; cursor:pointer; font-size:12px;">
@@ -582,20 +601,20 @@ DAG_DASHBOARD_HTML = SHARED_STYLE + """
 
 const STATUS_DOT = {
   COMPLETED: "#4caf6e", RUNNING: "#ffb74d", WAITING: "#9090b0",
-  FAILED: "#ff5252",   DEAD: "#ff5252",    CANCELLED: "#ffa000", PENDING: "#9090b0"
+  FAILED: "#ff5252",   DEAD: "#ff5252",    CANCELLED: "#78909c", PENDING: "#9090b0"
 };
 const STATUS_FILL = {
   COMPLETED:"#132213", RUNNING:"#1e2010", WAITING:"#141420",
-  FAILED:"#221313",    DEAD:"#221313",    CANCELLED:"#221a10", PENDING:"#141420"
+  FAILED:"#221313",    DEAD:"#221313",    CANCELLED:"#141820", PENDING:"#141420"
 };
 const BADGE_BG = {
   COMPLETED:"rgba(0,230,118,.1)",  RUNNING:"rgba(255,183,77,.12)",
   WAITING:"rgba(120,120,160,.12)", FAILED:"rgba(255,82,82,.1)",
-  DEAD:"rgba(255,82,82,.1)",       CANCELLED:"rgba(255,160,0,.1)", PENDING:"rgba(120,120,160,.12)"
+  DEAD:"rgba(255,82,82,.1)",       CANCELLED:"rgba(120,144,156,.15)", PENDING:"rgba(120,120,160,.12)"
 };
 const BADGE_COLOR = {
   COMPLETED:"#00e676", RUNNING:"#ffb74d", WAITING:"#9090b0",
-  FAILED:"#ff5252",    DEAD:"#ff5252",    CANCELLED:"#ffa000", PENDING:"#9090b0"
+  FAILED:"#ff5252",    DEAD:"#ff5252",    CANCELLED:"#78909c", PENDING:"#9090b0"
 };
 
 // Track last known statuses so we only repaint changed nodes
@@ -861,6 +880,55 @@ async function hitlDecide(jobId, decision, btn) {
   }
 }
 
+// ── Stop (cancel) a single job ────────────────────────────────
+async function stopJob(jobId) {
+  const btn = document.getElementById("stop-job-btn");
+  if (!btn) return;
+  if (!confirm(`Stop job "${jobId}"? This will kill the running process and cancel all downstream jobs.`)) return;
+  btn.disabled = true;
+  btn.textContent = "⏳ Stopping…";
+  try {
+    const r = await fetch(`/api/job/${encodeURIComponent(jobId)}/cancel`, { method: "POST" });
+    const data = await r.json();
+    if (r.ok && data.status === "ok") {
+      btn.textContent = "⬛ Stopped";
+      btn.style.color = "#78909c";
+      btn.style.borderColor = "#78909c55";
+    } else {
+      btn.textContent = "✗ Error";
+      btn.disabled = false;
+    }
+  } catch {
+    btn.textContent = "✗ No connection";
+    btn.disabled = false;
+  }
+}
+
+// ── Stop (cancel) all active jobs in a DAG ────────────────────
+async function stopDag(dagId) {
+  const btn = document.getElementById("stop-dag-btn");
+  if (!btn) return;
+  if (!confirm(`Stop all running and waiting jobs in this DAG? This cannot be undone.`)) return;
+  btn.disabled = true;
+  btn.textContent = "⏳ Stopping…";
+  try {
+    const r = await fetch(`/api/dag/${encodeURIComponent(dagId)}/cancel`, { method: "POST" });
+    const data = await r.json();
+    if (r.ok && data.status === "ok") {
+      btn.textContent = "⬛ Stopped";
+      btn.style.color = "#78909c";
+      btn.style.borderColor = "#78909c55";
+      btn.style.background = "#141820";
+    } else {
+      btn.textContent = "✗ Error";
+      btn.disabled = false;
+    }
+  } catch {
+    btn.textContent = "✗ No connection";
+    btn.disabled = false;
+  }
+}
+
 // Kick off HITL polling (slightly offset from dag_status to spread load)
 setTimeout(pollHitl, 1500);
 
@@ -921,6 +989,7 @@ LOG_VIEW_HTML = SHARED_STYLE + """
   <a class="tab" href="/">🖥 Orchestrator</a>
   <a class="tab" href="/dags">🔀 DAG Pipelines</a>
   <a class="tab" href="/dags/new">✏️ Constructor</a>
+  <a class="tab" href="/agents">🤖 Agent Runs</a>
 </nav>
 <div style="padding:20px; display:flex; flex-direction:column; height:calc(100vh - 89px);">
   <h2 style="margin-top:0; color:#64b5f6; border-bottom:1px solid #333; padding-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
@@ -1318,9 +1387,10 @@ def dag_dashboard(dag_id=None):
         for jid in meta["jobs"]:
             stored = jobs_meta.get(jid, {})
             status = stored.get("status", "WAITING")
-            # Normalise: map DEAD/UNKNOWN to FAILED so the UI makes sense
+            # Normalise terminal states for display
             if status in ("DEAD", "UNKNOWN", ""):
                 status = "FAILED"
+            # CANCELLED stays as CANCELLED (distinct grey colour)
             req = stored.get("requirement", "GENERAL")
             jobs_data.append({
                 "id":          jid,
@@ -1678,10 +1748,229 @@ def api_hitl_reject(job_id):
     return jsonify({"status": "ok", "job_id": job_id, "decision": "REJECTED"})
 
 
+@app.route('/api/job/<job_id>/cancel', methods=['POST'])
+def api_cancel_job(job_id):
+    """Cancel a single running or queued job by its full ID (e.g. DAG-hitl-train)."""
+    result = titan_communicate(OP_CANCEL_JOB, job_id)
+    if result is None:
+        return jsonify({"status": "error", "message": "Master unreachable"}), 502
+    if result == "NOT_FOUND":
+        return jsonify({"status": "error", "message": f"Job '{job_id}' not found or already finished"}), 404
+    return jsonify({"status": "ok", "job_id": job_id, "result": result})
+
+
+@app.route('/api/dag/<dag_id>/cancel', methods=['POST'])
+def api_cancel_dag(dag_id):
+    """Cancel all active (running/waiting/pending) jobs in a DAG."""
+    if dag_id not in dag_registry:
+        return jsonify({"status": "error", "message": f"DAG '{dag_id}' not found"}), 404
+
+    jobs      = dag_registry[dag_id].get("jobs", [])
+    jobs_meta = dag_registry[dag_id].get("job_meta", {})
+    cancelled = []
+    errors    = []
+
+    for jid in jobs:
+        stored_status = jobs_meta.get(jid, {}).get("status", "WAITING")
+        if stored_status in ("COMPLETED", "FAILED", "CANCELLED", "DEAD"):
+            continue  # already terminal — skip
+        result = titan_communicate(OP_CANCEL_JOB, jid)
+        if result in (None, "NOT_FOUND"):
+            errors.append(jid)
+        else:
+            cancelled.append(jid)
+
+    if not cancelled and errors:
+        return jsonify({"status": "error", "message": "No jobs cancelled", "errors": errors}), 502
+
+    return jsonify({"status": "ok", "dag_id": dag_id, "cancelled": cancelled, "skipped": errors})
+
+
+# ================================================================
+# AGENT RUNS VIEW  — groups DAGs that share an agent_run_id
+# Passive: only appears when agent_run_id entries exist in manifest
+# ================================================================
+
+AGENT_RUNS_HTML = SHARED_STYLE + """
+<head><title>Titan — Agent Runs</title><meta http-equiv="refresh" content="3"></head>
+<body>
+<nav class="topnav">
+  <span class="topnav-brand">⚡ TITAN</span>
+  <a class="tab" href="/">🖥 Orchestrator</a>
+  <a class="tab" href="/dags">🔀 DAG Pipelines</a>
+  <a class="tab" href="/dags/new">✏️ Constructor</a>
+  <a class="tab active" href="/agents">🤖 Agent Runs</a>
+  <div class="topnav-right">
+    <span class="conn-dot" style="background:{{ status_color }}"></span>
+    <span style="color:{{ status_color }}; font-weight:600;">{{ status_text }}</span>
+  </div>
+</nav>
+
+<div class="page-wrap">
+<style>
+  .ar-card { background:#1a1a2e; border:1px solid #2a2a4a; border-radius:10px; padding:20px 24px; margin-bottom:18px; }
+  .ar-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+  .ar-id { font-family:monospace; color:#90caf9; font-size:.85em; }
+  .ar-ts { font-size:.78em; color:#666; }
+  .ar-chain { display:flex; align-items:center; flex-wrap:wrap; gap:0; }
+  .ar-stage { display:flex; align-items:center; }
+  .ar-box { background:#12122a; border:1px solid #333; border-radius:6px; padding:8px 14px; min-width:90px; text-align:center; cursor:pointer; transition:border-color .2s; text-decoration:none; display:block; }
+  .ar-box:hover { border-color:#64b5f6; }
+  .ar-box-name { font-size:.72em; color:#aaa; font-family:monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px; }
+  .ar-box-status { font-size:.78em; font-weight:700; margin-top:3px; }
+  .ar-arrow { color:#444; font-size:1.3em; padding:0 6px; user-select:none; }
+  .st-COMPLETED { color:#00e676; }
+  .st-RUNNING   { color:#ffb74d; }
+  .st-FAILED    { color:#ff5252; }
+  .st-WAITING   { color:#9090b0; }
+  .st-PARTIAL   { color:#ce93d8; }
+  .ar-empty { text-align:center; color:#555; padding:60px 0; font-size:1.1em; }
+  .ar-count { background:#1e1e3e; border:1px solid #333; border-radius:20px; padding:3px 10px; font-size:.78em; color:#90caf9; margin-left:10px; }
+</style>
+
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+  <h2 style="margin:0; letter-spacing:1px;">🤖 Agent Runs
+    <span class="ar-count">{{ agent_runs|length }} run{{ 's' if agent_runs|length != 1 else '' }}</span>
+  </h2>
+  <span style="font-size:.8em; color:#555;">Each row is one agent invocation — stages shown in execution order</span>
+</div>
+
+{% if agent_runs %}
+  {% for run in agent_runs %}
+  <div class="ar-card">
+    <div class="ar-header">
+      <div>
+        <span style="font-weight:600; font-size:.95em;">Run</span>
+        <span class="ar-id">{{ run.id }}</span>
+      </div>
+      <span class="ar-ts">{{ run.ts }}</span>
+    </div>
+    <div class="ar-chain">
+      {% for stage in run.stages %}
+      <div class="ar-stage">
+        <a class="ar-box" href="/dags/DAG-{{ stage.dag_name }}">
+          <div class="ar-box-name" title="{{ stage.dag_name }}">{{ stage.label }}</div>
+          <div class="ar-box-status st-{{ stage.status }}">{{ stage.status }}</div>
+        </a>
+        {% if not loop.last %}
+        <span class="ar-arrow">→</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="ar-empty">
+    No agent runs yet.<br>
+    <span style="font-size:.85em; color:#444; margin-top:8px; display:block;">
+      Run an agent that passes <code style="color:#90caf9;">agent_run_id</code> to <code style="color:#90caf9;">submit_dag()</code> and it will appear here.
+    </span>
+  </div>
+{% endif %}
+
+</div>
+</body>
+"""
+
+
+def _dag_run_status(dag_name):
+    """Returns the overall status of a DAG by name from dag_registry."""
+    dag_key = f"DAG-{dag_name}"
+    meta = dag_registry.get(dag_key)
+    if not meta:
+        return "WAITING"
+    return _resolve_dag_status_from_meta(meta)
+
+
+def _short_stage_label(dag_name, run_id_prefix):
+    """Strips the run_id prefix to give a short readable stage label."""
+    label = dag_name
+    if run_id_prefix and label.startswith(run_id_prefix):
+        label = label[len(run_id_prefix):].lstrip("_")
+    # Further shorten common suffixes: RESEARCH_cb5e13_PLAN → PLAN
+    parts = label.split("_")
+    return parts[-1] if parts else label
+
+
+@app.route('/agents')
+def agent_runs_view():
+    # Refresh dag_registry
+    raw_json = titan_communicate(OP_STATS_JSON, "")
+    status_color, status_text = "#f44336", "OFFLINE"
+    if raw_json:
+        try:
+            json_start = raw_json.find('{')
+            if json_start != -1:
+                stats = json.loads(raw_json[json_start:])
+                discover_dags_from_stats(stats)
+                status_color, status_text = "#00e676", "ONLINE"
+        except Exception:
+            pass
+
+    scan_yaml_dags()
+
+    agent_runs = []
+    manifest_path = ".titan_dag_manifest.json"
+    if os.path.exists(manifest_path):
+        try:
+            with open(manifest_path) as f:
+                manifest = json.load(f)
+
+            import datetime
+            for key, entry in manifest.items():
+                if not key.startswith("__agent_run__"):
+                    continue
+                run_id   = entry.get("agent_run_id", key.replace("__agent_run__", ""))
+                stages   = entry.get("stages", [])
+                run_ts   = entry.get("run_ts", 0)
+
+                # Find common prefix to strip for labels (e.g. "RESEARCH_cb5e13_")
+                prefix = ""
+                if stages:
+                    # All stage names share a prefix up to the last underscore before the stage label
+                    parts = stages[0].split("_")
+                    if len(parts) >= 2:
+                        prefix = "_".join(parts[:-1]) + "_"
+
+                stage_list = []
+                for dag_name in stages:
+                    status = _dag_run_status(dag_name)
+                    label  = _short_stage_label(dag_name, prefix)
+                    stage_list.append({"dag_name": dag_name, "label": label, "status": status})
+
+                ts_str = ""
+                if run_ts:
+                    try:
+                        ts_str = datetime.datetime.fromtimestamp(run_ts / 1000).strftime("%Y-%m-%d %H:%M:%S")
+                    except Exception:
+                        pass
+
+                agent_runs.append({
+                    "id":     run_id,
+                    "stages": stage_list,
+                    "ts":     ts_str,
+                    "run_ts": run_ts,
+                })
+
+            # Most recent first
+            agent_runs.sort(key=lambda r: r["run_ts"], reverse=True)
+        except Exception:
+            pass
+
+    return render_template_string(
+        AGENT_RUNS_HTML,
+        agent_runs   = agent_runs,
+        status_color = status_color,
+        status_text  = status_text,
+    )
+
+
 if __name__ == '__main__':
     print("=" * 50)
     print("  Titan Dashboard")
     print("  http://127.0.0.1:5000          ← Orchestrator view")
     print("  http://127.0.0.1:5000/dags     ← DAG pipeline view")
+    print("  http://127.0.0.1:5000/agents   ← Agent runs view")
     print("=" * 50)
     app.run(host='0.0.0.0', port=5000, debug=False)

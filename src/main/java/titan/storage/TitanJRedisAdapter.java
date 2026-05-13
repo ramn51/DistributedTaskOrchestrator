@@ -93,6 +93,28 @@ import java.util.*;
     }
 
     /**
+     * Attempts to re-establish the Redis connection if it is currently disconnected.
+     * Called automatically before every operation. Silently skips if host/port are not configured.
+     */
+    private synchronized void tryReconnect() {
+        if (isConnected) return;
+        if (host == null || host.isEmpty() || port <= 0) return;
+        try {
+            if (socket != null && !socket.isClosed()) {
+                try { socket.close(); } catch (IOException ignored) {}
+            }
+            this.socket = new Socket(host, port);
+            this.socket.setTcpNoDelay(true);
+            this.out = socket.getOutputStream();
+            this.in  = new BufferedInputStream(socket.getInputStream());
+            this.isConnected = true;
+            System.out.println("[INFO][RECONNECT] Re-connected to Redis.");
+        } catch (IOException e) {
+            this.isConnected = false;
+        }
+    }
+
+    /**
      * Executes a raw Redis command by sending it to the server and reading its response.
      * This method handles the RESP serialization of the command arguments and deserialization of the response.
      * It is synchronized to ensure only one command is processed at a time, maintaining command-response order.
@@ -108,16 +130,8 @@ import java.util.*;
         return readResponse();
     }
 
-    /**
-     * Retrieves the string value associated with the specified key from Redis.
-     * If the adapter is not connected, or if an error occurs, it returns {@code null}.
-     *
-     * @param key The key whose value is to be retrieved.
-     * @return The string value associated with the key, or {@code null} if the key does not exist,
-     *         the adapter is not connected, or an error occurs.
-     * @throws IOException If an I/O error occurs during the Redis operation.
-     */
     public String get(String key) throws IOException {
+        tryReconnect();
         if (!isConnected) return null;
         try {
             return (String) execute("GET", key);
@@ -127,19 +141,9 @@ import java.util.*;
         }
     }
 
-    /**
-     * Sets the string value of a key in Redis.
-     * If the adapter is not connected, or if an error occurs, it returns {@code null}.
-     *
-     * @param key The key to set.
-     * @param value The string value to associate with the key.
-     * @return The status string from Redis (e.g., "OK"), or {@code null} if the adapter is not connected or an error occurs.
-     * @throws IOException If an I/O error occurs during the Redis operation.
-     */
     public String set(String key, String value) throws IOException {
-        if (!isConnected) {
-            return null;
-        }
+        tryReconnect();
+        if (!isConnected) return null;
         try {
             return (String) execute("SET", key, value);
         } catch (IOException e) {
@@ -149,17 +153,8 @@ import java.util.*;
         }
     }
 
-    /**
-     * Adds the specified member to the set stored at {@code key} in Redis.
-     * If the adapter is not connected, or if an error occurs, it returns {@code 0}.
-     *
-     * @param key The key of the set.
-     * @param member The member to add to the set.
-     * @return {@code 1} if the member was added successfully and was new, {@code 0} if the member already existed
-     *         or if the adapter is not connected or an error occurs.
-     * @throws IOException If an I/O error occurs during the Redis operation.
-     */
     public long sadd(String key, String member) throws IOException {
+        tryReconnect();
         if (!isConnected) return 0;
         try {
             Object res = execute("SADD", key, member);
@@ -173,18 +168,9 @@ import java.util.*;
     }
 
     @SuppressWarnings("unchecked")
-    /**
-     * Returns all members of the set stored at {@code key} in Redis.
-     * If the adapter is not connected, or if an error occurs, it returns an empty set.
-     *
-     * @param key The key of the set.
-     * @return A {@link Set} of strings representing all members of the set.
-     *         Returns an empty set if the key does not exist, the adapter is not connected, or an error occurs.
-     * @throws IOException If an I/O error occurs during the Redis operation.
-     */
     public Set<String> smembers(String key) throws IOException {
+        tryReconnect();
         if (!isConnected) return Collections.emptySet();
-
         try {
             Object res = execute("SMEMBERS", key);
             if (res instanceof List) {
@@ -194,20 +180,11 @@ import java.util.*;
             System.err.println("[INFO][FAILED] Redis SMEMBERS failed: " + e.getMessage());
             this.isConnected = false;
         }
-
         return Collections.emptySet();
     }
 
-    /**
-     * Removes the specified member from the set stored at {@code key} in Redis.
-     * If the adapter is not connected, or if an error occurs, it returns {@code 0}.
-     *
-     * @param key The key of the set.
-     * @param member The member to remove from the set.
-     * @return {@code 1} if the member was removed successfully, {@code 0} if the member was not found,
-     *         or if the adapter is not connected or an error occurs.
-     */
     public long srem(String key, String member) {
+        tryReconnect();
         if (!isConnected) return 0;
         try {
             Object res = execute("SREM", key, member);

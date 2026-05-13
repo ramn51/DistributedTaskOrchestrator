@@ -63,10 +63,17 @@ nav:
   - 🏠 Home: index.md
   - 🚀 Getting Started: getting-started.md
   - 💡 Examples:
-      - Static Pipelines (YAML): examples/yaml.md
-      - Agentic Workflows (Python): examples/agentic.md
-      - Human-in-the-Loop (HITL): examples/hitl.md
-      - Dagster Integration: examples/dagster.md
+      - Overview: examples/agentic.md
+      - Pipelines:
+          - Static Pipelines (YAML): examples/yaml.md
+          - Distributed LLM Pipeline: examples/comp-intel-pipeline.md
+          - Dagster Integration: examples/dagster.md
+      - Agentic:
+          - Build Your First Agent (10 min): examples/quickstart-agent.md
+          - Research Agent: examples/research-agent.md
+          - Code Generation Agent: examples/code-gen-agent.md
+          - Human-in-the-Loop (HITL): examples/hitl.md
+          - Multi-Agent Research Pipeline: examples/research-pipeline.md
   - 📚 API and SDK Reference: 
       - Titan SDK: reference/sdk.md
       - Java Engine API: javadocs/docs/index.html

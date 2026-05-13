@@ -260,7 +260,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="examples/yaml/" class="md-tabs__link">
+        <a href="examples/agentic/" class="md-tabs__link">
           
   
   
@@ -762,6 +762,86 @@
   
   
     <li class="md-nav__item">
+      <a href="examples/agentic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="examples/yaml/" class="md-nav__link">
         
   
@@ -790,14 +870,14 @@
   
   
     <li class="md-nav__item">
-      <a href="examples/agentic/" class="md-nav__link">
+      <a href="examples/comp-intel-pipeline/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Agentic Workflows (Python)
+    Distributed LLM Pipeline
   
 
     
@@ -834,6 +914,186 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agentic
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Agentic
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="examples/research-agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research Agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="examples/code-gen-agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Generation Agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="examples/hitl/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Human-in-the-Loop (HITL)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="examples/research-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Agent Research Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1639,6 +1899,8 @@ The examples are added as folders for each category,</p>
 <li><strong>Static YAML Pipelines:</strong> Templates for basic Diamond Patterns, massive parallel Fan-outs, and strict hardware-aware routing (e.g., forcing tasks to <code>GPU</code> nodes).</li>
 <li><strong>Dynamic Logic Switches:</strong> Python SDK scripts that simulate measuring system traffic and dynamically spawn entirely different DAGs on the fly.</li>
 <li><strong>Autonomous Agents:</strong> A recursive, self-healing agent that tracks its own retry attempts globally via TitanStore and spawns clones across the cluster until a fragile task succeeds.</li>
+<li><strong>Human-in-the-Loop Pipelines:</strong> A complete ML pipeline that pauses between preprocessing and training to wait for human approval. Demonstrates the <code>hitl_message</code> SDK parameter, the amber Dashboard banner, Approve/Reject flow, and per-gate timeouts. (<a href="examples/hitl/">View the guide</a>)</li>
+<li><strong>Multi-Agent Research Pipeline:</strong> A fully agentic research system where parallel Claude workers investigate subtopics simultaneously, a HITL gate lets you review before committing, and a synthesis agent fans in all results into a polished Markdown report. Demonstrates TitanStore as shared agent memory, dynamic fan-out, and chained HITL. (<a href="examples/research-pipeline/">View the guide</a>)</li>
 <li><strong>Dagster Integration:</strong> A complete hybrid pipeline where Dagster manages the UI and data lineage, while Titan handles the physical distributed compute and log streaming.</li>
 </ul>
 <blockquote>
@@ -1662,7 +1924,7 @@ The examples are added as folders for each category,</p>
 <li class="task-list-item"><input type="checkbox" disabled/> <strong>Security &amp; Auth:</strong> Implement mTLS (Mutual TLS) for encrypted, authenticated cluster communication.</li>
 <li class="task-list-item"><input type="checkbox" disabled/> <strong>Containerized Execution:</strong> Add support for Docker execution drivers to provide true filesystem isolation (currently utilizing Process-Level isolation).</li>
 <li class="task-list-item"><input type="checkbox" disabled/> <strong>Cluster Autoscaler Webhooks:</strong> Allow Titan to trigger external APIs (e.g., Azure VM Scale Sets, AWS EC2) to provision bare-metal compute automatically when queues saturate.</li>
-<li class="task-list-item"><input type="checkbox" disabled/> <strong>Human-in-the-Loop (HIL):</strong> Add the capability to pause DAG execution states and wait for external manual approval via Webhooks or the UI.</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> <strong>Human-in-the-Loop (HITL):</strong> Pause DAG execution and wait for human Approve/Reject via the Dashboard. Supports per-gate timeouts and automatic gate injection via the SDK. See <a href="examples/hitl/">HITL Pipelines</a>.</li>
 </ul>
 <hr />
 <h2 id="project-status-contributing">Project Status &amp; Contributing</h2>

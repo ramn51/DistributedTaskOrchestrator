@@ -69,6 +69,11 @@ import titan.storage.TitanJRedisAdapter;
     private final Map<String, Job> runningJobs = new ConcurrentHashMap<>();
     private final Map<String, Job> dagWaitingRoom;
 
+    // Job IDs that were explicitly cancelled by the user.  When a stale FAILED
+    // callback arrives from the worker (after the process was killed), we discard
+    // it here rather than triggering the normal retry / DEAD path.
+    private final Set<String> cancelledJobs = ConcurrentHashMap.newKeySet();
+
     // AutoScaling declarations
     int MAX_WORKERS = 5;
     private volatile boolean scalingInProgress = false;
@@ -894,6 +899,10 @@ import titan.storage.TitanJRedisAdapter;
  * @param job The {@link Job} that failed.
  */
     private void handleJobFailure(Job job) {
+        // Don't retry a job that was explicitly cancelled by the user.
+        if (cancelledJobs.contains(job.getId())) {
+            return;
+        }
         // If the worker is autoscaled messed up then immediately fail it and not send it to the queue for retry
         if (job.getId().startsWith("WRK-")) {
             System.err.println("[SCALER] Auto-scale job " + job.getId() + " failed. Abandoning job so Scaler can pick a new port.");
@@ -939,6 +948,81 @@ import titan.storage.TitanJRedisAdapter;
     }
 
     /**
+     * Cancels a job by ID regardless of its current state (queued, waiting, or running).
+     * <ul>
+     *   <li>Pending in taskQueue → removed and marked CANCELLED.</li>
+     *   <li>Waiting in dagWaitingRoom → removed, marked CANCELLED, children cascaded.</li>
+     *   <li>Running on a worker → kill signal sent to worker, marked CANCELLED, children cascaded.</li>
+     * </ul>
+     *
+     * @param jobId The full job ID (e.g., "DAG-hitl-train").
+     * @return A status string for the caller ("CANCELLED" or "NOT_FOUND").
+     */
+    public String cancelJob(String jobId) {
+        System.out.println("[CANCEL] Cancelling job: " + jobId);
+        cancelledJobs.add(jobId);
+
+        // --- 1. Remove from pending task queue ---
+        taskQueue.removeIf(j -> j.getId().equals(jobId));
+
+        // --- 2. Remove from DAG waiting room ---
+        Job waitingJob = dagWaitingRoom.remove(jobId);
+        if (waitingJob != null) {
+            waitingJob.setStatus(Job.Status.CANCELLED);
+            TaskExecution ghostRecord = new TaskExecution(jobId, null);
+            ghostRecord.status = Job.Status.CANCELLED;
+            ghostRecord.endTime = System.currentTimeMillis();
+            ghostRecord.output  = "Cancelled by user";
+            executionHistory.put(jobId, ghostRecord);
+            safeRedisSet("job:" + jobId + ":status", "CANCELLED");
+            safeRedisSrem("system:active_jobs", jobId);
+            cancelChildren(jobId);
+            System.out.println("[CANCEL] Removed waiting job: " + jobId);
+            return "CANCELLED";
+        }
+
+        // --- 3. Kill on worker if actively running ---
+        Job runningJob = runningJobs.remove(jobId);
+        TaskExecution record = executionHistory.get(jobId);
+
+        if (record != null) {
+            record.status  = Job.Status.CANCELLED;
+            record.endTime = System.currentTimeMillis();
+            if (record.assignedWorker != null) {
+                record.assignedWorker.currentJobId = null;
+                record.assignedWorker.decrementCurrentLoad();
+                try {
+                    schedulerClient.sendRequest(
+                            record.assignedWorker.host(),
+                            record.assignedWorker.port(),
+                            TitanProtocol.OP_CANCEL_JOB,
+                            jobId);
+                } catch (Exception e) {
+                    System.err.println("[CANCEL] Could not reach worker for kill signal: " + e.getMessage());
+                }
+            }
+        }
+
+        if (runningJob != null) {
+            runningJob.setStatus(Job.Status.CANCELLED);
+            // Surface in workerRecentHistory so the dashboard shows CANCELLED
+            if (record != null && record.assignedWorker != null) {
+                String wKey = String.valueOf(record.assignedWorker.port());
+                java.util.Deque<Job> hist = workerRecentHistory.computeIfAbsent(wKey, k -> new java.util.concurrent.ConcurrentLinkedDeque<>());
+                hist.removeIf(j -> j.getId().equals(jobId));
+                hist.add(runningJob);
+                if (hist.size() > 10) hist.removeFirst();
+            }
+        }
+
+        safeRedisSet("job:" + jobId + ":status", "CANCELLED");
+        safeRedisSrem("system:active_jobs", jobId);
+        cancelChildren(jobId);
+
+        return runningJob != null ? "CANCELLED" : "NOT_FOUND";
+    }
+
+    /**
  * Processes callbacks from workers regarding the completion or failure of asynchronous jobs.
  * The payload typically contains the job ID, status (COMPLETED/FAILED), and an optional result message.
  * This method updates the job's status, clears the worker's active job flag, and triggers completion or failure handling.
@@ -953,6 +1037,12 @@ import titan.storage.TitanJRedisAdapter;
         String jobId = parts[0];
         String statusStr = parts[1];
         String result = (parts.length > 2) ? parts[2] : "";
+
+        // Discard stale callbacks that arrive after the job was cancelled.
+        if (cancelledJobs.remove(jobId)) {
+            System.out.println("[CANCEL] Dropped stale callback for cancelled job: " + jobId);
+            return;
+        }
 
         TaskExecution record = executionHistory.get(jobId);
         Job job = runningJobs.remove(jobId);

@@ -10,8 +10,9 @@ For direct examples to run check out these:
 
 **For Agentic:**
 
-`titan_test_suite/examples/agents_example/code_healer_agent.py`
-`titan_test_suite/examples/agents_exampels/doc_generator_agent/tools/doc_dispatcher.py`
+`titan_test_suite/examples/agents_examples/research_agent/research_agent.py`
+`titan_test_suite/examples/agents_examples/code_gen_agent/code_gen_agent.py`
+`titan_test_suite/examples/agents_examples/research_pipeline/research_pipeline.py`
 
 **For Deterministic:**
 
@@ -27,7 +28,7 @@ Using the SDK, you construct units of work using the `TitanJob` class and define
 ```python
 from titan_sdk import TitanClient, TitanJob
 
-client = TitanClient(host="localhost", port=9090)
+client = TitanClient()
 
 # 1. Define the Root Task
 task_a = TitanJob(
@@ -62,7 +63,7 @@ _Best for_: __Conditional logic, real-time load balancing, and dynamic infrastru
 
 Because you are using pure Python, you can use standard if/else logic to decide which execution graph to build based on real-time cluster stats, database queries, or external API calls.
 
-The "Logic Switch"
+### The "Logic Switch"
 In this scenario, our script checks the current traffic load. If traffic is high, it submits a single, lightweight task. If traffic is low, it dynamically generates a massive parallel "Deep Analysis" DAG.
 
 
@@ -112,11 +113,11 @@ flowchart LR
 ## 3. Agentic Workflows & LLMs (Mode 2)
 _Best for_: __AI Agents, Self-Healing loops, and recursive execution.__
 
-In this mode, Titan acts as the physical execution substrate for Software Agents. Because Titan is completely decoupled, an LLM (like GPT-4 or Gemini) can evaluate the output of a previous task and dynamically formulate a brand new TitanJob to execute.
+In this mode, Titan acts as the physical execution substrate for Software Agents. Because Titan is completely decoupled, an LLM (like Gemini) can evaluate the output of a previous task and dynamically formulate a brand new TitanJob to execute.
 
 The task graph itself is generated dynamically during execution.
 
-The "Self-Healing" Loop
+### The "Self-Healing" Loop
 Imagine an agent that monitors a distributed job. It fetches the remote execution logs, and if it detects a critical failure, it programmatically creates a new "Patch" job to remediate the issue on the fly.
 
 
@@ -253,5 +254,18 @@ flowchart LR
 
 **Why this is powerful:**
 You only need to submit autonomous_agent.py to the cluster once. From that point on, the agent manages its own lifecycle, hops between available hardware nodes using Titan's scheduler, and uses the distributed store to remember its past failures until the job succeeds.
+
+---
+
+## Full Worked Examples
+
+These end-to-end agents are ready to run and demonstrate the patterns above with real LLM calls, TitanStore coordination, and agentic loops:
+
+| Example | Pattern | What it shows |
+|---|---|---|
+| [Quickstart Agent](quickstart-agent.md) | Writer → Critic loop | Simplest agentic loop in ~60 lines |
+| [Research Agent](research-agent.md) | Planner → Researchers → Evaluator → Synthesizer | LLM-driven SYNTHESIZE / DEEPEN decision |
+| [Code Generation Agent](code-gen-agent.md) | Planner → Generators → Reviewer → Fixers → Integrator | Targeted fix loop — only flagged components re-run |
+| [Research Pipeline](research-pipeline.md) | Fan-out → HITL gate → Fan-in | Human-in-the-Loop approval before synthesis |
 
 

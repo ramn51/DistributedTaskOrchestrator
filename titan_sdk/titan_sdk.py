@@ -112,13 +112,19 @@ class TitanJob:
         return f"{self.id}|{header}|{payload_content}|{self.priority}|{self.delay}|{parents_str}{affinity_suffix}"
 
 class TitanClient:
-    def submit_dag(self, name, jobs):
-        """Submits a list of TitanJobs as a DAG"""
+    def submit_dag(self, name, jobs, agent_run_id=None):
+        """Submits a list of TitanJobs as a DAG.
+
+        agent_run_id: optional string — links this DAG to a logical agent run
+                      so the Agent Runs view in the dashboard can show all
+                      stages of one run as a connected chain.
+                      Has no effect on scheduling or execution.
+        """
         jobs = self._inject_hitl_gates(jobs)
         print(f"[SDK] Submitting DAG: {name}")
         dag_payload = " ; ".join([j.to_string() for j in jobs])
         result = self._send_request(OP_SUBMIT_DAG, dag_payload)
-        self._write_dag_manifest(name, jobs, dag_payload)
+        self._write_dag_manifest(name, jobs, dag_payload, agent_run_id=agent_run_id)
         return result
 
     def _inject_hitl_gates(self, jobs):
@@ -184,7 +190,7 @@ class TitanClient:
 
         return rewired
 
-    def _write_dag_manifest(self, dag_name, jobs, dag_payload=None):
+    def _write_dag_manifest(self, dag_name, jobs, dag_payload=None, agent_run_id=None):
         """Writes job→DAG mapping to .titan_dag_manifest.json for dashboard discovery."""
         manifest_path = ".titan_dag_manifest.json"
         try:
@@ -199,6 +205,17 @@ class TitanClient:
                 full_id = f"DAG-{job.id}"
                 full_deps = [f"DAG-{p}" for p in job.parents]
                 existing[full_id] = {"dag": dag_name, "deps": full_deps, "run_ts": run_ts}
+                if agent_run_id:
+                    existing[full_id]["agent_run_id"] = agent_run_id
+
+            # Track agent run summary — ordered list of stage DAG names
+            if agent_run_id:
+                key = f"__agent_run__{agent_run_id}"
+                run_entry = existing.get(key, {"agent_run_id": agent_run_id, "stages": [], "run_ts": run_ts})
+                if dag_name not in run_entry["stages"]:
+                    run_entry["stages"].append(dag_name)
+                run_entry["run_ts"] = run_ts
+                existing[key] = run_entry
             # Store the full payload string so the dashboard can redeploy this DAG
             if dag_payload is not None:
                 existing[f"__payload__{dag_name}"] = {"dag_payload": dag_payload, "run_ts": run_ts}
@@ -253,8 +270,39 @@ class TitanClient:
         """Securely queries the Master for a job's internal system status."""
         return self._send_request(OP_GET_JOB_STATUS, job_id)
 
+    def publish_artifact(self, key, filename):
+        """Upload a local file to master and register it under key.
+
+        Worker writes the file to CWD (titan_workspace/shared — local to this
+        node only), then calls publish_artifact. Uploads to master's uploads/
+        directory and stores the basename in TitanStore at key.
+
+        Orchestrator retrieves with: get_artifact(key, save_path=...)
+
+        Returns True on success, False on upload failure.
+        """
+        result = self.upload_file(filename)
+        if result != "UPLOAD_SUCCESS":
+            print(f"[SDK] publish_artifact: upload failed — {result}")
+            return False
+        self.store_put(key, os.path.basename(filename))
+        return True
+
+    def get_artifact(self, key, save_path=None):
+        """Download a file previously published under key.
+
+        Reads the basename from TitanStore, fetches the file from master's
+        uploads/ directory. Returns True on success, False if the key has no
+        artifact registered or the download fails.
+        """
+        filename = self.store_get(key)
+        if not filename or filename in ("NULL", "CLEARED"):
+            return False
+        target = save_path or f"/tmp/{filename}"
+        return self.fetch_artifact(filename, save_path=target)
+
     def upload_file(self, filepath):
-        """Uploads a single file to Master's perm_files"""
+        """Uploads a single file to master's uploads/ directory."""
         # STRICT PATHING
         if not os.path.exists(filepath):
             return f"ERROR: File not found at: {filepath}"

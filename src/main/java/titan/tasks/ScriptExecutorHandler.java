@@ -40,6 +40,29 @@ import titan.network.LogBatcher;
  */
     public class ScriptExecutorHandler implements TaskHandler {
     /**
+     * Registry of actively running script processes, keyed by job ID.
+     * Populated on process start and cleared on completion/failure.
+     * Used by {@link #killJob(String)} to forcibly terminate a running script.
+     */
+    private static final java.util.concurrent.ConcurrentHashMap<String, Process> activeProcesses =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Forcibly terminates the process associated with the given job ID.
+     * @return {@code true} if a process was found and destroyed, {@code false} if not found.
+     */
+    public static boolean killJob(String jobId) {
+        Process p = activeProcesses.get(jobId);
+        if (p != null) {
+            p.destroyForcibly();
+            System.out.println("[CANCEL] Killed process for job: " + jobId);
+            return true;
+        }
+        System.out.println("[CANCEL] No active process found for job: " + jobId);
+        return false;
+    }
+
+    /**
      * The base directory name for all Titan worker workspaces.
      * All job-specific and shared workspaces will be created under this directory.
      */
@@ -208,6 +231,7 @@ import titan.network.LogBatcher;
 
             // 3. Start Process
             Process process = pb.start();
+            activeProcesses.put(jobId, process);
 
             final String finalJobId = jobId;
             StringBuilder finalOutput = new StringBuilder();
@@ -259,6 +283,7 @@ import titan.network.LogBatcher;
             e.printStackTrace();
             return "ERROR: Execution failed - " + e.getMessage();
         } finally {
+            activeProcesses.remove(jobId);
             batcher.close();
         }
     }

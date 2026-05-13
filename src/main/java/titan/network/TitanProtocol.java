@@ -165,6 +165,12 @@ import java.nio.charset.StandardCharsets;
  */
     public static final byte OP_GET_JOB_STATUS    = 0x55;
     /**
+     * OpCode for cancelling a running or queued job by its ID.
+     * Payload: job ID string. Scheduler kills the process on the assigned worker,
+     * removes the job from all queues, and cascades cancellation to waiting children.
+     */
+    public static final byte OP_CANCEL_JOB        = 0x56;
+    /**
      * SEND: Wraps the payload in our 8-byte header.
      * [ Version(1) | OpCode(1) | Flags(1) | Spare(1) | Length(4) ] + [ Payload ]
      */

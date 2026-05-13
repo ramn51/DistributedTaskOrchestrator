@@ -18,7 +18,7 @@ import java.util.*;
 
 public class Job implements Comparable<Job> {
     public enum Status{
-        PENDING, RUNNING, COMPLETED, FAILED, DEAD
+        PENDING, RUNNING, COMPLETED, FAILED, DEAD, CANCELLED
     }
 
     public static final int PRIORITY_LOW = 0;

@@ -46,6 +46,7 @@ import titan.network.TitanProtocol.TitanPacket;
     private final ServerSocket serverSocket;
 
     private static final String PERM_FILES_DIR = "perm_files";
+    private static final String UPLOADS_DIR    = "uploads";
 
     /**
  * Constructs a new {@code SchedulerServer} instance.
@@ -474,11 +475,11 @@ import titan.network.TitanProtocol.TitanPacket;
                 String assetData = uploadParts[1];
 
                 try{
-                    File permDir = new File("perm_files");
-                    if(!permDir.exists()) permDir.mkdirs();
+                    File uploadsDir = new File(UPLOADS_DIR);
+                    if(!uploadsDir.exists()) uploadsDir.mkdirs();
 
                     byte[] decodedBytes = Base64.getDecoder().decode(assetData);
-                    File destFile = new File(permDir, assetName);
+                    File destFile = new File(uploadsDir, assetName);
                     Files.write(destFile.toPath(), decodedBytes);
                     System.out.println("[UPLOAD] Saved asset: " + assetName + " (" + decodedBytes.length + " bytes)");
                     return "UPLOAD_SUCCESS";
@@ -490,7 +491,7 @@ import titan.network.TitanProtocol.TitanPacket;
             case TitanProtocol.OP_FETCH_ASSET:
                 // Payload: "filename" (e.g., "my_project.zip")
                 String requestedFile = payload.trim();
-                File assetFile = new File("perm_files/" + requestedFile);
+                File assetFile = new File(UPLOADS_DIR + "/" + requestedFile);
 
                 if (!assetFile.exists()) {
                     return "ERROR_NOT_FOUND";
@@ -537,6 +538,8 @@ import titan.network.TitanProtocol.TitanPacket;
                 String status = scheduler.redisKVGet("job:" + payload + ":status");
                 return status == null ? "NULL" : status;
 
+            case TitanProtocol.OP_CANCEL_JOB:
+                return scheduler.cancelJob(payload.trim());
 
             default:
                 return "UNKNOWN_OPCODE: " + packet.opCode;

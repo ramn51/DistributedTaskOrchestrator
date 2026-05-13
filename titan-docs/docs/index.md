@@ -259,6 +259,7 @@ The examples are added as folders for each category,
 * **Dynamic Logic Switches:** Python SDK scripts that simulate measuring system traffic and dynamically spawn entirely different DAGs on the fly.
 * **Autonomous Agents:** A recursive, self-healing agent that tracks its own retry attempts globally via TitanStore and spawns clones across the cluster until a fragile task succeeds.
 * **Human-in-the-Loop Pipelines:** A complete ML pipeline that pauses between preprocessing and training to wait for human approval. Demonstrates the `hitl_message` SDK parameter, the amber Dashboard banner, Approve/Reject flow, and per-gate timeouts. ([View the guide](examples/hitl.md))
+* **Multi-Agent Research Pipeline:** A fully agentic research system where parallel Claude workers investigate subtopics simultaneously, a HITL gate lets you review before committing, and a synthesis agent fans in all results into a polished Markdown report. Demonstrates TitanStore as shared agent memory, dynamic fan-out, and chained HITL. ([View the guide](examples/research-pipeline.md))
 * **Dagster Integration:** A complete hybrid pipeline where Dagster manages the UI and data lineage, while Titan handles the physical distributed compute and log streaming.
 
 > **💡 Built with Titan:** The official JavaDocs for the Titan Core Engine were completely generated, zipped, and distributed using Titan itself as the execution runtime!

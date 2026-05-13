@@ -259,6 +259,10 @@ public class RpcWorkerServer {
 //                            System.exit(0);
 //                        }
                         handleAsyncExecution(out, packet.payload);
+                    } else if (packet.opCode == TitanProtocol.OP_CANCEL_JOB) {
+                        String targetJobId = packet.payload.trim();
+                        boolean killed = titan.tasks.ScriptExecutorHandler.killJob(targetJobId);
+                        TitanProtocol.send(out, TitanProtocol.OP_ACK, killed ? "KILLED" : "NOT_FOUND");
                     } else if (packet.opCode == TitanProtocol.OP_KILL_WORKER) {
                         System.out.println("[INFO] Worker received Kill Signal (OP_KILL_WORKER). Shutting down...");
                         TitanProtocol.send(out, TitanProtocol.OP_KILL_WORKER, "SUCCESS: Worker shutting down.");
