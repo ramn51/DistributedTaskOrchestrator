@@ -1,4 +1,4 @@
-# Distributed LLM Pipeline — Competitive Intelligence
+# Distributed LLM Pipeline — Parallel Analyst
 
 A parallel, fan-out/fan-in pipeline where multiple Gemini agents analyse competing frameworks simultaneously and a synthesis agent consolidates the results into a structured report.
 
@@ -14,17 +14,36 @@ Given a topic and a list of frameworks or products to compare, the pipeline:
 2. Each analyst writes its result to the **shared workspace**
 3. A **synthesis agent** (dependent on all analysts completing) reads all results and calls Gemini to produce a structured comparison report
 
-```
-Orchestrator
-    │  submit_dag()
-    ▼
-Titan Master
-    ├── analyst-0  →  Gemini  →  shared/intel_<run_id>_result_0.txt
-    ├── analyst-1  →  Gemini  →  shared/intel_<run_id>_result_1.txt
-    └── analyst-2  →  Gemini  →  shared/intel_<run_id>_result_2.txt
-             │  (all three must complete)
-             ▼
-        synthesizer  →  Gemini  →  shared/comp_intel_<fws>_<run_id>.md
+```mermaid
+flowchart TD
+    O["🐍 Orchestrator\n(your machine)"]
+    M["Titan Master"]
+
+    O -->|"submit_dag()"| M
+
+    M --> A0["analyst-0\ngemini-2.5-flash\nFramework 0"]
+    M --> A1["analyst-1\ngemini-2.5-flash\nFramework 1"]
+    M --> A2["analyst-2\ngemini-2.5-flash\nFramework 2"]
+
+    A0 -->|"intel_result_0.txt"| WS[("titan_workspace\n/shared")]
+    A1 -->|"intel_result_1.txt"| WS
+    A2 -->|"intel_result_2.txt"| WS
+
+    A0 --> S["synthesizer\ngemini-2.5-flash\nFan-in report"]
+    A1 --> S
+    A2 --> S
+
+    WS -->|"reads all results"| S
+    S --> RPT["📄 comp_intel_report.md"]
+
+    style O fill:#1e293b,stroke:#1de9b6,stroke-width:2px,color:#ffffff
+    style M fill:#1e293b,stroke:#64748b,stroke-width:2px,color:#ffffff
+    style A0 fill:#1e293b,stroke:#818cf8,stroke-width:2px,color:#ffffff
+    style A1 fill:#1e293b,stroke:#818cf8,stroke-width:2px,color:#ffffff
+    style A2 fill:#1e293b,stroke:#818cf8,stroke-width:2px,color:#ffffff
+    style WS fill:#1e293b,stroke:#f9a826,stroke-width:2px,color:#ffffff
+    style S fill:#1e293b,stroke:#22c55e,stroke-width:2px,color:#ffffff
+    style RPT fill:#1e293b,stroke:#22c55e,stroke-width:2px,color:#ffffff
 ```
 
 ---

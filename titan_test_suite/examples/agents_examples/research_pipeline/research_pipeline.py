@@ -9,29 +9,27 @@
 """
 research_pipeline.py — Multi-Agent Research Pipeline orchestrator.
 
-Submits a Titan DAG that:
-  1. Fans out N parallel Claude research workers (one per subtopic)
-  2. Pauses at a HITL gate so you can review before the final synthesis
-  3. Fans back in with Claude Opus to synthesize a polished Markdown report
+Stage 1: Planner (Gemini) decides subtopics at runtime — the DAG shape is
+         not known until this stage completes.
+Stage 2: N parallel research workers fan out across the cluster (N determined
+         by the planner, not hardcoded).
+Stage 3: HITL gate — human approves or rejects before synthesis runs.
+Stage 4: Synthesizer fans in all results into a final Markdown report.
 
-This example showcases:
-  - Dynamic DAG construction (N jobs built from a Python list at runtime)
-  - TitanStore as shared agent memory (all workers read topic config, write results)
-  - Parallel fan-out / fan-in execution pattern
-  - Human-in-the-Loop gate between research and synthesis
-  - Live log streaming in the Dashboard
+The agentic element is the Planner: it decides how many subtopics to research
+and what they are. The orchestrator cannot build the research DAG until the
+planner has run — making this a genuinely dynamic pipeline.
 
 Usage:
     python research_pipeline.py
     python research_pipeline.py "Quantum computing in finance"
-    python research_pipeline.py "LLM safety" "Alignment research" "Red-teaming" "Interpretability"
 
 Requires:
-    pip install anthropic          # on every worker node
-    export ANTHROPIC_API_KEY=...   # on every worker node
+    pip install google-genai python-dotenv
+    GEMINI_API_KEY in .env or shell
 
 Dashboard:
-    http://localhost:5000          # watch the parallel workers execute in real time
+    http://localhost:5000
 """
 
 import sys
@@ -43,14 +41,14 @@ import uuid
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.abspath(os.path.join(_HERE, "..", "..", "..", ".."))
 
+_PLANNER_SCRIPT    = os.path.join(_HERE, "pipeline_planner.py")
 _RESEARCH_SCRIPT   = os.path.join(_HERE, "research_subtopic.py")
 _SYNTHESIZE_SCRIPT = os.path.join(_HERE, "synthesize_report.py")
 _HITL_GATE_SCRIPT  = os.path.join(_HERE, "hitl_gate.py")
 
-for _f in (_RESEARCH_SCRIPT, _SYNTHESIZE_SCRIPT, _HITL_GATE_SCRIPT):
+for _f in (_PLANNER_SCRIPT, _RESEARCH_SCRIPT, _SYNTHESIZE_SCRIPT, _HITL_GATE_SCRIPT):
     if not os.path.exists(_f):
         print(f"[ERROR] Required script not found: {_f}")
-        print("[ERROR] Make sure you are running from inside the titan-orchestrator repo.")
         sys.exit(1)
 
 # ── Titan KV helpers (write config before submitting the DAG) ─────────────────
@@ -62,99 +60,91 @@ except ImportError:
     sys.exit(1)
 
 
-# ── Default research config ────────────────────────────────────────────────────
-DEFAULT_TOPIC = "The future of AI agents in software engineering"
-DEFAULT_SUBTOPICS = [
-    "Current Landscape & State of the Art",
-    "Key Technical Challenges",
-    "Emerging Patterns & Architectures",
-    "Impact on Developer Workflows",
-]
+DEFAULT_TOPIC  = "The future of AI agents in software engineering"
+POLL_INTERVAL  = 2
+POLL_TIMEOUT   = 180
 
 
-def parse_args():
-    """
-    Accepts optional CLI overrides:
-      - First arg   : main topic
-      - Remaining   : custom subtopics (minimum 2, maximum 8)
-    """
-    args = sys.argv[1:]
-    if not args:
-        return DEFAULT_TOPIC, DEFAULT_SUBTOPICS
-
-    topic = args[0]
-    if len(args) > 1:
-        subtopics = args[1:]
-        if len(subtopics) < 2:
-            print("[WARN] Provide at least 2 subtopics. Using defaults.")
-            subtopics = DEFAULT_SUBTOPICS
-        elif len(subtopics) > 8:
-            print("[WARN] Maximum 8 subtopics. Truncating.")
-            subtopics = subtopics[:8]
-    else:
-        subtopics = DEFAULT_SUBTOPICS
-
-    return topic, subtopics
+def wait_for_signal(client, key, label, timeout=POLL_TIMEOUT):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        val = client.store_get(key)
+        if val and val not in ("NULL", "CLEARED"):
+            print(f"[PIPELINE]   {label} — done", flush=True)
+            return True
+        time.sleep(POLL_INTERVAL)
+    print(f"[PIPELINE]   {label} — TIMED OUT", flush=True)
+    return False
 
 
 def main():
-    topic, subtopics = parse_args()
-    run_id = uuid.uuid4().hex[:12]      # short unique ID for this pipeline run
+    topic  = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_TOPIC
+    run_id = uuid.uuid4().hex[:12]
+    tag    = run_id[:6]
 
     print()
     print("╔══════════════════════════════════════════════════════════╗")
     print("║           Titan Multi-Agent Research Pipeline            ║")
     print("╚══════════════════════════════════════════════════════════╝")
     print(f"  Topic     : {topic}")
-    print(f"  Subtopics : {len(subtopics)}")
-    for i, s in enumerate(subtopics):
-        print(f"              [{i}] {s}")
     print(f"  Run ID    : {run_id}")
     print(f"  Dashboard : http://localhost:5000")
     print()
 
     client = TitanClient()
 
-    # ── Step 1: Write pipeline config to TitanStore ───────────────────────────
-    # All worker nodes will read this before calling Claude.
-    print("[SETUP] Writing pipeline config to TitanStore...", flush=True)
+    # ── Stage 1: Write topic to TitanStore, run Planner ───────────────────────
+    # Planner decides subtopics at runtime — the research DAG cannot be built
+    # until this stage completes.
     client.store_put(f"titan:research:{run_id}:topic", topic)
-    client.store_put(f"titan:research:{run_id}:count", str(len(subtopics)))
-    for i, subtopic in enumerate(subtopics):
-        client.store_put(f"titan:research:{run_id}:subtopic:{i}", subtopic)
-    print("[SETUP] Config stored.", flush=True)
 
-    # ── Step 2: Build the DAG ─────────────────────────────────────────────────
+    print("[PIPELINE] Stage 1 — Planner: deciding subtopics...", flush=True)
+    planner_job = TitanJob(
+        job_id      = f"pipeline-planner-{tag}",
+        filename    = _PLANNER_SCRIPT,
+        args        = run_id,
+        requirement = "GENERAL",
+        priority    = 5,
+    )
+    client.submit_dag(f"PIPELINE_{tag}_PLAN", [planner_job], agent_run_id=run_id)
 
-    # N parallel research jobs — each runs on any available GENERAL worker
+    if not wait_for_signal(client, f"titan:research:{run_id}:planner:done", label="planner"):
+        print("[ERROR] Planner timed out.", flush=True)
+        sys.exit(1)
+
+    # Read subtopics decided by the planner
+    count     = int(client.store_get(f"titan:research:{run_id}:count") or 0)
+    subtopics = [client.store_get(f"titan:research:{run_id}:subtopic:{i}") for i in range(count)]
+
+    print(f"[PIPELINE] Planner decided {count} subtopics:", flush=True)
+    for i, s in enumerate(subtopics):
+        print(f"  [{i}] {s}", flush=True)
+
+    # ── Stage 2-4: Build and submit the research DAG dynamically ──────────────
+    # N is now determined by the planner — not hardcoded or from CLI args.
     research_jobs = [
         TitanJob(
-            job_id    = f"research-{i}",
-            filename  = _RESEARCH_SCRIPT,
-            args      = f"{run_id} {i}",
+            job_id      = f"research-{i}",
+            filename    = _RESEARCH_SCRIPT,
+            args        = f"{run_id} {i}",
             requirement = "GENERAL",
-            priority  = 5,
+            priority    = 5,
         )
-        for i in range(len(subtopics))
+        for i in range(count)
     ]
 
-    # HITL review gate — waits for all research jobs to finish
-    # The reviewer sees the Approve/Reject buttons in the Dashboard.
-    # Approved → synthesis runs.  Rejected → pipeline halts.
     gate_job = TitanJob(
         job_id   = "research-review",
         filename = _HITL_GATE_SCRIPT,
         args     = (
-            f"research-review "
-            f"3600 "                     # 1-hour timeout
-            f"Research complete: {len(subtopics)} subtopics analyzed for "
-            f"'{topic}'. Approve to generate the final report."
+            f"research-review 3600 "
+            f"Planner decided {count} subtopics for '{topic}'. "
+            f"Research complete — approve to synthesize the final report."
         ),
-        parents  = [f"research-{i}" for i in range(len(subtopics))],
+        parents  = [f"research-{i}" for i in range(count)],
         priority = 5,
     )
 
-    # Single synthesis job — fans in all results and writes the final report
     synthesis_job = TitanJob(
         job_id   = "synthesize",
         filename = _SYNTHESIZE_SCRIPT,
@@ -165,28 +155,20 @@ def main():
 
     all_jobs = research_jobs + [gate_job, synthesis_job]
 
-    # ── Step 3: Submit ────────────────────────────────────────────────────────
-    dag_name = f"research-pipeline-{run_id}"
-    print(f"\n[SUBMIT] Submitting DAG '{dag_name}' with {len(all_jobs)} jobs...", flush=True)
+    print(f"\n[PIPELINE] Stage 2 — Submitting {count} parallel researchers + HITL + synthesizer...", flush=True)
+    result = client.submit_dag(f"PIPELINE_{tag}_RESEARCH", all_jobs, agent_run_id=run_id)
+    print(f"[PIPELINE] Master response: {result}", flush=True)
 
-    result = client.submit_dag(dag_name, all_jobs)
-    print(f"[SUBMIT] Master response: {result}", flush=True)
-
-    # ── Step 4: Instructions ──────────────────────────────────────────────────
     print()
     print("╔══════════════════════════════════════════════════════════╗")
-    print("║  Pipeline submitted! Here is what happens next:         ║")
+    print("║  Pipeline running! What happens next:                   ║")
     print("╠══════════════════════════════════════════════════════════╣")
-    print(f"║  1. {len(subtopics)} research workers run in parallel on the cluster  ")
-    print( "║     Each calls Gemini to research its assigned subtopic. ║")
+    print(f"║  {count} research workers running in parallel on the cluster  ")
     print( "║                                                          ║")
-    print( "║  2. When all finish, the HITL gate activates.           ║")
-    print( "║     → Open the Dashboard → DAG Pipelines                ║")
-    print( "║     → Click [Approve] to generate the final report      ║")
-    print( "║     → Click [Reject]  to halt the pipeline              ║")
-    print( "║                                                          ║")
-    print( "║  3. The synthesis job calls Gemini to combine all       ║")
-    print( "║     research into a polished Markdown report.           ║")
+    print( "║  When all finish, the HITL gate activates:             ║")
+    print( "║  → Dashboard → DAG Pipelines                           ║")
+    print( "║  → Click [Approve] to generate the final report        ║")
+    print( "║  → Click [Reject]  to halt the pipeline                ║")
     print( "║                                                          ║")
     print(f"║  Dashboard → http://localhost:5000                       ║")
     print( "╚══════════════════════════════════════════════════════════╝")

@@ -48,6 +48,8 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
   - attr_list
   - md_in_html
   - pymdownx.blocks.caption
@@ -66,7 +68,7 @@ nav:
       - Overview: examples/agentic.md
       - Pipelines:
           - Static Pipelines (YAML): examples/yaml.md
-          - Distributed LLM Pipeline: examples/comp-intel-pipeline.md
+          - Parallel Analyst Pipeline: examples/comp-intel-pipeline.md
           - Dagster Integration: examples/dagster.md
       - Agentic:
           - Build Your First Agent (10 min): examples/quickstart-agent.md

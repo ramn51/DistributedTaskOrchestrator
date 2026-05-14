@@ -13,22 +13,38 @@ The main entry point for connecting to the cluster.
 ```python
 from titan_sdk import TitanClient
 
-# Initialize connection (defaults to localhost:9090)
-client = TitanClient(host="localhost", port=9090)
-
+# No constructor args — host and port are configured via
+# TITAN_HOST / TITAN_PORT environment variables (default: 127.0.0.1:9090)
+client = TitanClient()
 ```
+
+**DAG submission**
 
 | Method | Description |
 | --- | --- |
 | `client.submit_job(job)` | Dispatches a single `TitanJob` to the cluster. |
-| `client.submit_dag(name, jobs)` | Submits a list of linked `TitanJob` objects as a single DAG. |
+| `client.submit_dag(name, jobs, agent_run_id=None)` | Submits a list of linked `TitanJob` objects as a single named DAG. Pass `agent_run_id` to link multiple DAG submissions into one logical agent run visible in the Dashboard. |
 | `client.get_job_status(job_id)` | Securely queries the Master for a job's internal system status. |
 | `client.fetch_logs(job_id)` | Retrieves the stdout/stderr logs for a specific job ID. |
+
+**File transfer**
+
+| Method | Description |
+| --- | --- |
+| `client.upload_file(filepath)` | Uploads a single file to the Master's `uploads/` directory. Returns `"UPLOAD_SUCCESS"` on success. |
 | `client.upload_project_folder(path)` | Zips and uploads a local folder to the Master's artifact registry. |
-| `client.upload_file(filepath)` | Uploads a single file to the Master's artifact registry. |
-| `client.store_put(key, value)` | Saves a string value to the distributed TitanStore (Data Bus). |
+| `client.publish_artifact(key, filename)` | **Worker-side.** Uploads `filename` to Master and registers the basename in TitanStore under `key`. Pair with `get_artifact` on the orchestrator side. |
+| `client.get_artifact(key, save_path=None)` | **Orchestrator-side.** Reads the filename registered under `key`, downloads it from Master, and saves to `save_path` (defaults to `/tmp/<filename>`). Returns `True` on success. |
+| `client.fetch_artifact(filename, save_path=None)` | Low-level download by filename from Master's `uploads/` directory. |
+| `client.deploy_script(filepath)` | Deploys a worker script to Master's `perm_files/` directory. Returns `"DEPLOY_SUCCESS"` on success. |
+
+**TitanStore (shared KV)**
+
+| Method | Description |
+| --- | --- |
+| `client.store_put(key, value)` | Saves a string value to the distributed TitanStore. |
 | `client.store_get(key)` | Retrieves a string value from the distributed TitanStore. |
-| `client.store_sadd(key, member)` | Adds a member to a distributed Set. Returns 1 if new, 0 if exists. |
+| `client.store_sadd(key, member)` | Adds a member to a distributed Set. Returns `1` if new, `0` if already exists. |
 | `client.store_smembers(key)` | Returns a Python list of all members in the specified Set. |
 
 ### `TitanJob`
@@ -89,12 +105,27 @@ task_b = TitanJob(
     job_id="train_model",
     filename="ml/train.py",
     requirement="GPU",
-    parents=["extract_data"] # <--- Defines the dependency
+    parents=["extract_data"]  # <--- Defines the dependency
 )
 
 # Step 3: Submit them as a unified DAG
 client.submit_dag("nightly_pipeline", [task_a, task_b])
 print("DAG Submitted!")
+```
+
+### Linking multiple DAGs into one Agent Run
+
+For agentic workflows that submit several DAGs sequentially, pass the same `agent_run_id` to each `submit_dag` call. This links all stages into a single run entry in the Dashboard's **Agent Runs** view.
+
+```python
+import uuid
+run_id = uuid.uuid4().hex[:12]
+
+client.submit_dag("PLAN",    [planner_job],   agent_run_id=run_id)
+# ... wait for planner, read results ...
+client.submit_dag("EXECUTE", executor_jobs,   agent_run_id=run_id)
+# ... wait, evaluate ...
+client.submit_dag("SYNTH",   [synthesis_job], agent_run_id=run_id)
 ```
 
 ---
@@ -125,5 +156,39 @@ accuracy = client.store_get("task_123_accuracy")
 completed_files = client.store_smembers("processed_files")
 
 print(f"Downstream task received accuracy: {accuracy}")
-
 ```
+
+---
+
+## 4. File Artifacts
+
+Use artifacts when a worker produces a file that the orchestrator (or a downstream worker) needs to read. TitanStore only holds strings — for binary files or large text outputs, use the artifact system.
+
+**Pattern: worker publishes → orchestrator downloads**
+
+```python
+# worker_script.py (runs on a worker node)
+from titan_sdk import TitanClient
+
+client = TitanClient()
+
+# Write the output file to the local workspace
+with open("report.md", "w") as f:
+    f.write(final_report)
+
+# Upload to master and register under a TitanStore key
+client.publish_artifact(f"run:{run_id}:report", "report.md")
+```
+
+```python
+# orchestrator.py (runs on your machine)
+from titan_sdk import TitanClient
+
+client = TitanClient()
+
+# Download the file by key — saves to /tmp/report.md by default
+client.get_artifact(f"run:{run_id}:report", save_path=f"/tmp/report_{run_id}.md")
+```
+
+!!! note "Worker workspace is local to the worker node"
+    `titan_workspace/shared` exists on the worker node, not on the master or orchestrator. `publish_artifact` is the correct way to move files across nodes. Do not assume the orchestrator can read files written by workers directly.
