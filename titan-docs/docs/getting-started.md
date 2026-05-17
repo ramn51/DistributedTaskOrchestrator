@@ -134,7 +134,7 @@ The Constructor also auto-generates the equivalent **Python SDK** and **YAML** c
 
 > **Note:** The Deploy button submits jobs by reading script files from the Master's `perm_files` directory by filename. Make sure any scripts you reference in the Constructor already exist in `perm_files` before clicking Deploy.
 
-![DAG Constructor](screenshots/DAG_Editor.png)
+![DAG Constructor](screenshots/constructor_overview.png)
 
 ## 5. Advanced: Manual & IDE Setup
 

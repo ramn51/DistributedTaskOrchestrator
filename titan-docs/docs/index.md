@@ -14,13 +14,13 @@ It allows you to deploy standalone services, execute individual batch jobs, or d
 !!! tip "Ready to dive in?" 
     Skip the reading and jump straight into the code. Follow our **[5-Minute Quickstart](getting-started.md)** to run your first distributed task, or view the **[Python SDK Reference](reference/sdk.md)**.
 
-![Titan Dashboard](screenshots/UI_Screenshot.png)
+![Titan Dashboard](screenshots/dashboard_orchestrator.png)
 
 ### Live Pipeline Visibility — DAG Pipelines View
 
 Every pipeline submitted to the cluster — via CLI, SDK, YAML, or the visual Constructor — is automatically rendered as a live dependency graph with real-time execution status per node.
 
-![DAG Visualizer](screenshots/DAG_Visualizer_.png)
+![DAG Visualizer](screenshots/visualizer_overview.png)
 
 ---
 
@@ -172,17 +172,17 @@ Titan is designed to grow with your system's complexity:
 ## Built-In Dashboard
 Titan includes a lightweight Python Flask dashboard to visualize cluster health, monitor worker load, and stream stdout/stderr from distributed jobs in real-time.
 
-The dashboard also ships with two DAG-specific views: a **DAG Visualizer** for inspecting any running or completed pipeline, and a **DAG Constructor** for building and deploying new ones from the browser.
+The dashboard ships with three views:
+
+- **DAG Visualizer** — live graph of any running or completed pipeline with real-time status, logs, HITL approval, and workspace file downloads
+- **DAG Constructor** — browser-based drag-and-drop builder for designing and deploying pipelines without writing code
+- **Agent Runs** — groups multi-stage agent invocations into a single timeline row so you can track a full agent loop at a glance instead of hunting through individual DAG entries
 
 > For the dashboard you will need Flask as external dependency (The core engine has zero dependencies, this is an extension)
-
-![Titan Dashboard](screenshots/UI_Screenshot.png)
 
 ### DAG Visualizer
 
 The DAG Pipelines view automatically renders a live graph of every pipeline that has been submitted to the cluster — regardless of how it was submitted. Whether a DAG was deployed via the CLI, the Python SDK, a YAML file, or the visual Constructor, it will appear here with its nodes, dependency edges, and real-time execution status.
-
-![DAG Visualizer](screenshots/DAG_Visualizer_.png)
 
 - **YAML and SDK-based DAGs** are represented accurately with full node and dependency structure.
 - **Dynamic DAGs** (flow-based, code-driven) are visualized based on the graph as submitted to the Master at runtime.
@@ -201,7 +201,7 @@ The Constructor also auto-generates the equivalent **Python SDK** and **YAML** d
 !!! note "Prerequisite"
     The Deploy button submits jobs by reading script files from the Master's `perm_files` directory. Ensure the script files you reference in the Constructor have been created and staged to `perm_files` before deploying.
 
-![DAG Constructor Canvas](screenshots/DAG_Editor.png)
+![DAG Constructor Canvas](screenshots/constructor_overview.png)
 
 ### Live Log streaming
 

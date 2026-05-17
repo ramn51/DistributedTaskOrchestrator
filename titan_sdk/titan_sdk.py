@@ -235,6 +235,86 @@ class TitanClient:
 
     def submit_job(self, job):
         return self.submit_dag(job.id, [job])
+
+    def submit_yaml(self, yaml_path, agent_run_id=None, wait=False,
+                    poll_interval=2, timeout=300):
+        """Parse a YAML pipeline file and submit it as a DAG.
+
+        yaml_path:      path to a Titan YAML file
+        agent_run_id:   links this DAG to a logical agent run in the Dashboard
+        wait:           if True, blocks until all jobs reach a terminal state
+        poll_interval:  seconds between status polls (only used when wait=True)
+        timeout:        max seconds to wait before giving up (only used when wait=True)
+
+        Returns the master's submit response string, or False if wait=True and
+        the DAG did not complete within the timeout.
+
+        Example — sequential agentic loop:
+
+            client = TitanClient()
+            run_id = uuid.uuid4().hex[:12]
+
+            client.submit_yaml("bootstrap.yaml", agent_run_id=run_id, wait=True)
+
+            for cycle in range(max_cycles):
+                client.submit_yaml("arena_cycle.yaml", agent_run_id=run_id, wait=True)
+                win_rate = read_win_rate("match_history.json")
+                if meets_stopping_criterion(win_rate):
+                    break
+                elif win_rate < tau_da:
+                    client.submit_yaml("da_gym.yaml", agent_run_id=run_id, wait=True)
+                else:
+                    client.submit_yaml("ca_gym.yaml", agent_run_id=run_id, wait=True)
+
+            client.submit_yaml("export_deploy.yaml", agent_run_id=run_id, wait=True)
+        """
+        import time as _time
+        from titan_sdk.titan_yaml_parser import TitanYAMLParser
+
+        parser   = TitanYAMLParser(yaml_path)
+        jobs     = parser.build_jobs()
+        dag_name = f"{parser.get_project_name()}-{int(_time.time())}"
+        result   = self.submit_dag(dag_name, jobs, agent_run_id=agent_run_id)
+
+        if wait:
+            completed = self._wait_for_dag(jobs, poll_interval=poll_interval, timeout=timeout)
+            if not completed:
+                return False
+
+        return result
+
+    def _wait_for_dag(self, jobs, poll_interval=2, timeout=300):
+        """Block until every job in the list reaches a terminal state.
+
+        Terminal states: COMPLETED, FAILED, REJECTED, ERROR
+        HITL jobs stay in a non-terminal state until approved/rejected —
+        this method waits for them too, so set timeout generously when
+        a human decision is involved (e.g. timeout=3600 for a 1-hour gate).
+
+        Returns True if all jobs completed, False if timeout was reached.
+        """
+        import time as _time
+
+        TERMINAL = {"COMPLETED", "FAILED", "REJECTED", "ERROR"}
+        pending  = {j.id for j in jobs}
+        deadline = _time.time() + timeout
+
+        while pending and _time.time() < deadline:
+            done = set()
+            for job_id in pending:
+                status = (self.get_job_status(job_id) or "").strip().upper()
+                if status in TERMINAL:
+                    print(f"[SDK] {job_id} → {status}", flush=True)
+                    done.add(job_id)
+            pending -= done
+            if pending:
+                _time.sleep(poll_interval)
+
+        if pending:
+            print(f"[SDK] _wait_for_dag: timeout — still pending: {pending}", flush=True)
+            return False
+
+        return True
     
     def fetch_logs(self, job_id):
         return self._send_request(OP_GET_LOGS, job_id)

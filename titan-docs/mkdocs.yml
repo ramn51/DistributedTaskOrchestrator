@@ -76,7 +76,21 @@ nav:
           - Code Generation Agent: examples/code-gen-agent.md
           - Human-in-the-Loop (HITL): examples/hitl.md
           - Multi-Agent Research Pipeline: examples/research-pipeline.md
-  - 📚 API and SDK Reference: 
+  - 🛠️ DAG Constructor:
+      - Overview: constructor/overview.md
+      - Building DAGs: constructor/building-dags.md
+      - HITL Gates: constructor/hitl.md
+      - Managing DAGs: constructor/managing-dags.md
+      - Keyboard Shortcuts: constructor/keyboard-shortcuts.md
+
+  - 📊 DAG Visualizer:
+      - Overview: visualizer/overview.md
+      - Monitoring & Logs: visualizer/monitoring.md
+      - HITL Approval: visualizer/hitl-approval.md
+      - Workspace Files: visualizer/workspace-files.md
+      - Agent Runs: visualizer/agent-runs.md
+
+  - 📚 API and SDK Reference:
       - Titan SDK: reference/sdk.md
       - Java Engine API: javadocs/docs/index.html
       - Titan CLI: reference/cli.md

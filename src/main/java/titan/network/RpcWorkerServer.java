@@ -28,6 +28,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -170,6 +172,13 @@ public class RpcWorkerServer {
         try(ServerSocket serverSocket = new ServerSocket(port)){
             System.out.println("Worker Server started on port " + port);
             registerWithScheduler();
+
+            // Periodically re-register so the worker rejoins after a master restart
+            ScheduledExecutorService reRegister = Executors.newSingleThreadScheduledExecutor();
+            reRegister.scheduleAtFixedRate(() -> {
+                try { registerWithScheduler(); }
+                catch (Exception e) { System.err.println("[WARN] Re-registration failed: " + e.getMessage()); }
+            }, 30, 30, TimeUnit.SECONDS);
 
             while(this.isRunning){
                 Socket clientSocket = serverSocket.accept();
@@ -559,17 +568,29 @@ public class RpcWorkerServer {
     private void sendCallback(String jobId, String status, String result) {
         if(jobId.equals("UNKNOWN") || jobId.equals("TEST-JOB")) return;
 
-        try (Socket socket = new Socket(schedulerHost, schedulerPort);
-             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-             DataInputStream in = new DataInputStream(socket.getInputStream())) {
+        int maxAttempts = 5;
+        int delayMs = 1000;
+        String msg = jobId + "|" + status + "|" + result;
 
-            String msg = jobId + "|" + status + "|" + result;
-            TitanProtocol.send(out, TitanProtocol.OP_JOB_COMPLETE, msg);
-            TitanProtocol.read(in);
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try (Socket socket = new Socket(schedulerHost, schedulerPort);
+                 DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                 DataInputStream in = new DataInputStream(socket.getInputStream())) {
 
-        } catch (Exception e) {
-            System.err.println("[FAIL] Callback failed: " + e.getMessage());
+                TitanProtocol.send(out, TitanProtocol.OP_JOB_COMPLETE, msg);
+                TitanProtocol.read(in);
+                return; // success
+
+            } catch (Exception e) {
+                System.err.println("[FAIL] Callback attempt " + attempt + "/" + maxAttempts
+                        + " failed for " + jobId + ": " + e.getMessage());
+                if (attempt < maxAttempts) {
+                    try { Thread.sleep(delayMs); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+                    delayMs *= 2; // exponential backoff: 1s, 2s, 4s, 8s
+                }
+            }
         }
+        System.err.println("[FAIL] Callback permanently failed for " + jobId + " after " + maxAttempts + " attempts.");
     }
 
     /**

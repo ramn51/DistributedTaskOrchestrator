@@ -59,3 +59,4 @@ titan_test_suite/examples/agents_examples/doc_generator_agent/tools/.env
 # Runtime-generated — do not commit
 .titan_dag_manifest.json
 database6379.aof
+/uploads

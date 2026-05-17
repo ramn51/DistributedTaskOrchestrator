@@ -7,7 +7,7 @@ jobs:
     type: "run"
     file: "scripts/init_db.py"
     priority: 10              # 10 = Highest (System Critical)
-    
+
   # CASE 2: Delayed Execution
   - id: "market-watch"
     type: "run"
@@ -26,11 +26,23 @@ jobs:
     depends_on:
       - "market-watch"
 
-  # CASE 4: Service with Port Mapping
+  # CASE 4: Human-in-the-Loop gate
+  # Pauses the pipeline after data-processor completes.
+  # A gate job is auto-injected — downstream jobs are re-wired to wait
+  # for Dashboard Approve before proceeding. Reject halts the pipeline.
+  - id: "risk-check"
+    type: "run"
+    file: "src/risk_check.py"
+    hitl_message: "Risk analysis complete. Review results and approve to proceed."
+    max_wait_seconds: 3600    # Gate expires after 1 hour if no decision
+    depends_on:
+      - "data-processor"
+
+  # CASE 5: Service with Port Mapping
   - id: "api-gateway"
     type: "service"
     file: "src/gateway.py"
     port: 8095
     priority: 5
-    depends_on: 
-      - "data-processor"
+    depends_on:
+      - "risk-check"

@@ -13,8 +13,10 @@ import time
 import base64
 import os
 import glob as _glob
+import subprocess
 import re
 from flask import Flask, render_template_string, request, jsonify, send_from_directory
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
@@ -205,10 +207,12 @@ def discover_dags_from_stats(stats):
             elif reset_ts > 0 and completed_at == 0:
                 incoming_status = "WAITING"  # stale after explicit reset
 
+        existing_req = dag_registry[dag_key]["job_meta"].get(job_id, {}).get("requirement", "GENERAL")
         dag_registry[dag_key]["job_meta"][job_id] = {
-            "worker": meta["worker"],
-            "status": incoming_status,
-            "time":   meta["time"],
+            "worker":      meta["worker"],
+            "status":      incoming_status,
+            "time":        meta["time"],
+            "requirement": existing_req,
         }
         # Once a job genuinely completes in the current run (has a real timestamp),
         # clear the reset guard so it doesn't keep getting wiped on future polls.
@@ -250,7 +254,7 @@ SHARED_STYLE = """
 
   /* NAV */
   .topnav { background:#1a1a2e; border-bottom:1px solid #333; padding:0 24px; display:flex; align-items:center; gap:0; }
-  .topnav-brand { font-size:15px; font-weight:700; letter-spacing:1px; padding:14px 20px 14px 0; color:#fff; border-right:1px solid #333; margin-right:8px; }
+  .topnav-brand { font-size:15px; font-weight:700; letter-spacing:1px; padding:10px 20px 10px 0; color:#fff; border-right:1px solid #333; margin-right:8px; display:flex; align-items:center; }
   .topnav a.tab { padding:14px 18px; font-size:13px; color:#aaa; border-bottom:3px solid transparent; display:inline-block; }
   .topnav a.tab:hover { color:#fff; text-decoration:none; }
   .topnav a.tab.active { color:#64b5f6; border-bottom-color:#64b5f6; }
@@ -290,7 +294,7 @@ DASHBOARD_HTML = SHARED_STYLE + """
 <head><title>Titan — Orchestrator</title><meta http-equiv="refresh" content="2"></head>
 <body>
 <nav class="topnav">
-  <span class="topnav-brand">⚡ TITAN</span>
+  <span class="topnav-brand"><img src="/logo.png" style="height:28px; vertical-align:middle; margin-right:6px;">TITAN</span>
   <a class="tab active" href="/">🖥 Orchestrator</a>
   <a class="tab" href="/dags">🔀 DAG Pipelines</a>
   <a class="tab" href="/dags/new">✏️ Constructor</a>
@@ -323,9 +327,79 @@ DASHBOARD_HTML = SHARED_STYLE + """
   .st-DEAD      { color:#9e9e9e; background:rgba(158,158,158,.1); border:1px solid #555; }
 </style>
 
-<div style="text-align:center; margin-bottom:24px;">
-  <h2 style="letter-spacing:2px; margin:0;">🛰️ TITAN ORCHESTRATOR</h2>
+<div style="position:relative; text-align:center; margin-bottom:28px;">
+  <img src="/logo.png" style="height:120px; margin-bottom:10px; display:block; margin-left:auto; margin-right:auto;">
+  <h2 style="letter-spacing:2px; margin:0;">TITAN ORCHESTRATOR</h2>
+  <button onclick="document.getElementById('launch-modal').style.display='flex'"
+    style="position:absolute; right:0; top:50%; transform:translateY(-50%); background:#1b3a2a; border:1px solid #2e7d32; color:#81c784; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:.85em; font-weight:600; letter-spacing:.5px;">
+    + Launch Worker
+  </button>
 </div>
+
+<!-- Launch Worker Modal -->
+<div id="launch-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1000; align-items:center; justify-content:center;">
+  <div style="background:#1a1a2e; border:1px solid #333; border-radius:10px; padding:28px 32px; width:340px;">
+    <h3 style="margin:0 0 20px; letter-spacing:1px;">Launch Worker Node</h3>
+    <div style="margin-bottom:14px;">
+      <label style="font-size:.8em; color:#aaa; display:block; margin-bottom:4px;">Port</label>
+      <input id="lw-port" type="number" value="8082"
+        style="width:100%; background:#12122a; border:1px solid #333; color:#e0e0e0; padding:8px 10px; border-radius:5px; font-size:.9em; box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:14px;">
+      <label style="font-size:.8em; color:#aaa; display:block; margin-bottom:4px;">Capability</label>
+      <select id="lw-cap"
+        style="width:100%; background:#12122a; border:1px solid #333; color:#e0e0e0; padding:8px 10px; border-radius:5px; font-size:.9em; box-sizing:border-box;">
+        <option value="GENERAL">GENERAL</option>
+        <option value="GPU">GPU</option>
+        <option value="HIGH_MEM">HIGH_MEM</option>
+        <option value="PYTHON">PYTHON</option>
+      </select>
+    </div>
+    <div style="margin-bottom:20px; display:flex; align-items:center; gap:8px;">
+      <input id="lw-perm" type="checkbox"
+        style="width:16px; height:16px; cursor:pointer;">
+      <label for="lw-perm" style="font-size:.85em; color:#aaa; cursor:pointer;">Permanent (won't be evicted by auto-scaler)</label>
+    </div>
+    <div id="lw-msg" style="font-size:.8em; margin-bottom:12px; min-height:18px;"></div>
+    <div style="display:flex; gap:10px;">
+      <button onclick="launchWorker()"
+        style="flex:1; background:#1b3a2a; border:1px solid #2e7d32; color:#81c784; padding:9px; border-radius:5px; cursor:pointer; font-weight:600;">
+        Launch
+      </button>
+      <button onclick="document.getElementById('launch-modal').style.display='none'"
+        style="flex:1; background:#1a1a2e; border:1px solid #555; color:#aaa; padding:9px; border-radius:5px; cursor:pointer;">
+        Cancel
+      </button>
+    </div>
+  </div>
+</div>
+<script>
+function launchWorker() {
+  const port = document.getElementById('lw-port').value;
+  const cap  = document.getElementById('lw-cap').value;
+  const perm = document.getElementById('lw-perm').checked;
+  const msg  = document.getElementById('lw-msg');
+  msg.style.color = '#aaa';
+  msg.textContent = 'Launching…';
+  fetch('/api/worker/launch', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({port: parseInt(port), capability: cap, permanent: perm})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.status === 'ok') {
+      msg.style.color = '#81c784';
+      msg.textContent = 'Worker launched on port ' + port + ' (PID ' + d.pid + ')';
+      setTimeout(() => { document.getElementById('launch-modal').style.display='none'; location.reload(); }, 1500);
+    } else {
+      msg.style.color = '#ff5252';
+      msg.textContent = d.error || 'Launch failed';
+    }
+  })
+  .catch(() => { msg.style.color='#ff5252'; msg.textContent='Request failed'; });
+}
+</script>
 
 <div class="grid">
   {% for w in stats.workers %}
@@ -420,12 +494,22 @@ DAG_DASHBOARD_HTML = SHARED_STYLE + """
   .close-x:hover { color:#aaa; }
 
   .node-g { cursor:pointer; }
+
+  .files-panel { background:#1a1a24; border:1px solid #2a2a2a; border-radius:10px; padding:16px; margin-top:16px; }
+  .file-filter { width:100%; background:#0d0d14; border:1px solid #2a2a2a; color:#e0e0e0; font-size:12px; padding:6px 10px; border-radius:6px; outline:none; margin-bottom:8px; box-sizing:border-box; }
+  .files-grid { display:flex; flex-direction:column; gap:5px; }
+  .file-row { display:flex; align-items:center; gap:10px; padding:7px 10px; background:#0d0d14; border-radius:6px; border:1px solid #2a2a3a; }
+  .file-icon { font-size:15px; flex-shrink:0; width:20px; text-align:center; }
+  .file-name { flex:1; font-size:12px; color:#e0e0e0; font-family:'Consolas','Fira Code',monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  .file-size { font-size:10px; color:#555; flex-shrink:0; white-space:nowrap; }
+  .file-dl { background:#1a2040; border:1px solid #4f8ef744; color:#4f8ef7; font-size:11px; padding:3px 10px; border-radius:5px; cursor:pointer; text-decoration:none; flex-shrink:0; }
+  .file-dl:hover { background:#243060; }
 </style>
 </head>
 <body>
 
 <nav class="topnav">
-  <span class="topnav-brand">⚡ TITAN</span>
+  <span class="topnav-brand"><img src="/logo.png" style="height:28px; vertical-align:middle; margin-right:6px;">TITAN</span>
   <a class="tab" href="/">🖥 Orchestrator</a>
   <a class="tab active" href="/dags">🔀 DAG Pipelines</a>
   <a class="tab" href="/dags/new">✏️ Constructor</a>
@@ -584,6 +668,69 @@ DAG_DASHBOARD_HTML = SHARED_STYLE + """
         pollLogs();
       </script>
       {% endif %}
+
+      <!-- ── Workspace Files Panel ──────────────────────────── -->
+      <div class="files-panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div class="sec-title" style="margin:0;">Workspace Files</div>
+          <span style="font-size:11px;color:#555;" id="ws-file-count"></span>
+        </div>
+        <input class="file-filter" id="ws-filter" type="text" placeholder="Filter by filename…" oninput="wsFilter(this.value)"/>
+        <div class="files-grid" id="ws-files-grid">
+          <div style="color:#555;font-size:12px;padding:4px;">Loading…</div>
+        </div>
+      </div>
+
+      <script>
+      (function(){
+        const jobIds   = {{ selected_dag.jobs | map(attribute='id') | list | tojson }};
+        const shorts   = jobIds.map(id => id.replace(/^DAG-/,'').toLowerCase());
+        let wsAllFiles = [];
+
+        function fileIcon(ext){
+          if(ext==='.md'||ext==='.txt') return '📄';
+          if(ext==='.json')             return '📋';
+          if(ext==='.py')               return '🐍';
+          if(ext==='.log')              return '📜';
+          return '📁';
+        }
+        function fmtSize(b){
+          if(b<1024)    return b+' B';
+          if(b<1048576) return (b/1024).toFixed(1)+' KB';
+          return (b/1048576).toFixed(1)+' MB';
+        }
+        function renderWs(files){
+          const grid  = document.getElementById('ws-files-grid');
+          const count = document.getElementById('ws-file-count');
+          count.textContent = files.length ? files.length+' file'+(files.length!==1?'s':'') : '';
+          if(!files.length){
+            grid.innerHTML='<div style="color:#555;font-size:12px;padding:4px;">No matching files</div>';
+            return;
+          }
+          grid.innerHTML = files.map(f=>`
+            <div class="file-row">
+              <span class="file-icon">${fileIcon(f.ext)}</span>
+              <span class="file-name" title="${f.name}">${f.name}</span>
+              <span class="file-size">${fmtSize(f.size)}</span>
+              <a class="file-dl" href="/api/workspace/file/${encodeURIComponent(f.name)}" download="${f.name}">↓ Download</a>
+            </div>`).join('');
+        }
+        window.wsFilter = function(q){
+          const lq = q.toLowerCase();
+          renderWs(lq ? wsAllFiles.filter(f=>f.name.toLowerCase().includes(lq)) : wsAllFiles);
+        };
+        (async function loadWs(){
+          try{
+            const r = await fetch('/api/workspace/files?q='+encodeURIComponent(shorts.join(',')));
+            const d = await r.json();
+            wsAllFiles = d.files || [];
+            wsFilter(document.getElementById('ws-filter').value);
+          }catch(e){
+            document.getElementById('ws-files-grid').innerHTML='<div style="color:#555;font-size:12px;padding:4px;">Could not load workspace files</div>';
+          }
+        })();
+      })();
+      </script>
 
     {% else %}
       <div class="empty-state">
@@ -985,7 +1132,7 @@ LOG_VIEW_HTML = SHARED_STYLE + """
 <head><title>Titan Logs: {{ job_id }}</title></head>
 <body>
 <nav class="topnav">
-  <span class="topnav-brand">⚡ TITAN</span>
+  <span class="topnav-brand"><img src="/logo.png" style="height:28px; vertical-align:middle; margin-right:6px;">TITAN</span>
   <a class="tab" href="/">🖥 Orchestrator</a>
   <a class="tab" href="/dags">🔀 DAG Pipelines</a>
   <a class="tab" href="/dags/new">✏️ Constructor</a>
@@ -1146,7 +1293,8 @@ def scan_yaml_dags():
                     dag_registry[dag_key]["jobs"].append(full_id)
                 if full_id not in dag_registry[dag_key]["job_meta"]:
                     dag_registry[dag_key]["job_meta"][full_id] = {
-                        "worker": None, "status": "WAITING", "time": ""
+                        "worker": None, "status": "WAITING", "time": "",
+                        "requirement": info.get("requirement", "GENERAL"),
                     }
 
             # Clean up stale fallback DAG entries.
@@ -1486,6 +1634,25 @@ def api_dag_submit():
     jobs_raw = body['jobs']
     perm_dir = os.path.dirname(os.path.abspath(__file__))
 
+    # ── HITL gate injection ────────────────────────────────────────
+    # Build remap: source_job_id -> gate_job_id for all jobs with hitl_message
+    gate_file  = os.path.join(perm_dir, 'hitl_gate.py')
+    hitl_remap = {}
+    for j in jobs_raw:
+        if j.get('hitl_message'):
+            if not os.path.exists(gate_file):
+                return jsonify({"error": "hitl_gate.py not found in perm_files — required for HITL gates"}), 400
+            hitl_remap[j['id']] = f"hitl-gate-{j['id']}"
+
+    # Pre-load gate script b64 once and clear any stale KV decisions
+    gate_b64 = None
+    if hitl_remap:
+        with open(gate_file, 'rb') as f:
+            gate_b64 = base64.b64encode(f.read()).decode('utf-8')
+        for gate_id in hitl_remap.values():
+            titan_communicate(OP_KV_SET, f"titan:hitl:status:{gate_id}|CLEARED")
+
+    # ── Build job strings ──────────────────────────────────────────
     job_strings = []
     for j in jobs_raw:
         job_id   = j.get('id', '')
@@ -1497,6 +1664,9 @@ def api_dag_submit():
         args     = (j.get('args') or '').replace('|', ' ')
         parents  = j.get('depends_on') or []
         job_type = (j.get('job_type') or 'run').lower()
+
+        # Re-wire parents: if a parent has a gate, point to the gate instead
+        parents = [hitl_remap.get(p, p) for p in parents]
 
         parents_str     = '[' + ','.join(parents) + ']'
         affinity_suffix = '|AFFINITY' if affinity else ''
@@ -1520,12 +1690,39 @@ def api_dag_submit():
         line = f"{job_id}|{header}|{payload_content}|{priority}|{delay}|{parents_str}{affinity_suffix}"
         job_strings.append(line)
 
+        # Inject HITL gate immediately after this job if it has hitl_message
+        if j.get('hitl_message'):
+            gate_id  = hitl_remap[job_id]
+            safe_msg = j['hitl_message'].replace('|', ' ')
+            max_wait = int(j.get('max_wait_seconds') or 172800)
+            gate_args  = f"{gate_id} {max_wait} {safe_msg}"
+            gate_line  = (f"{gate_id}|RUN_PAYLOAD|hitl_gate.py|{gate_args}|{gate_b64}"
+                          f"|GENERAL|{priority}|0|[{job_id}]")
+            job_strings.append(gate_line)
+
     dag_payload = ' ; '.join(job_strings)
     resp = titan_communicate(0x04, dag_payload)  # 0x04 = OP_SUBMIT_DAG
 
     if resp and 'ERROR' not in (resp or '').upper():
-        # Write manifest so dashboard groups these jobs under the DAG name
-        _write_constructor_manifest(dag_name, jobs_raw, dag_payload)
+        # Build manifest list: original jobs (parents re-wired) + gate jobs
+        manifest_jobs = []
+        for j in jobs_raw:
+            rewired = dict(j)
+            rewired['depends_on'] = [hitl_remap.get(p, p) for p in (j.get('depends_on') or [])]
+            manifest_jobs.append(rewired)
+            if j.get('hitl_message'):
+                manifest_jobs.append({
+                    'id':         hitl_remap[j['id']],
+                    'filename':   'hitl_gate.py',
+                    'depends_on': [j['id']],
+                    'requirement': 'GENERAL',
+                })
+        _write_constructor_manifest(dag_name, manifest_jobs, dag_payload)
+        # Save canvas state so the DAG can be loaded back for editing
+        _nodes = body.get('_nodes', [])
+        _edges = body.get('_edges', [])
+        if _nodes:
+            _save_constructor_state(dag_name, _nodes, _edges)
         return jsonify({"status": "ok", "response": resp})
     return jsonify({"status": "error", "response": resp}), 502
 
@@ -1539,6 +1736,11 @@ def _write_constructor_manifest(dag_name, jobs_raw, dag_payload=""):
             with open(manifest_path) as f:
                 existing = json.load(f)
         run_ts = int(time.time() * 1000)
+        # Remove stale job entries from previous deploys of this DAG
+        stale_keys = [k for k, v in existing.items()
+                      if not k.startswith('__') and isinstance(v, dict) and v.get('dag') == dag_name]
+        for k in stale_keys:
+            del existing[k]
         for j in jobs_raw:
             full_id   = f"DAG-{j['id']}"
             full_deps = [f"DAG-{p}" for p in (j.get('depends_on') or [])]
@@ -1547,7 +1749,7 @@ def _write_constructor_manifest(dag_name, jobs_raw, dag_payload=""):
                 "deps":     full_deps,
                 "run_ts":   run_ts,
                 "filename": os.path.basename(j.get('filename', '')),
-                "req":      j.get('requirement', 'GENERAL'),
+                "requirement": j.get('requirement', 'GENERAL'),
             }
         # Store full payload for redeploy
         existing[f"__payload__{dag_name}"] = {"dag_payload": dag_payload, "run_ts": run_ts}
@@ -1565,6 +1767,141 @@ def _write_constructor_manifest(dag_name, jobs_raw, dag_payload=""):
             json.dump(existing, f, indent=2)
     except Exception:
         pass
+
+
+_CONSTRUCTOR_STATES_FILE = ".dag_constructor_states.json"
+
+
+def _save_constructor_state(dag_name, nodes, edges):
+    """Persists canvas nodes+edges so the DAG can be reloaded for editing."""
+    try:
+        existing = {}
+        if os.path.exists(_CONSTRUCTOR_STATES_FILE):
+            with open(_CONSTRUCTOR_STATES_FILE) as f:
+                existing = json.load(f)
+        existing[dag_name] = {
+            "nodes":    nodes,
+            "edges":    edges,
+            "saved_at": int(time.time() * 1000),
+        }
+        with open(_CONSTRUCTOR_STATES_FILE, 'w') as f:
+            json.dump(existing, f)
+    except Exception:
+        pass
+
+
+@app.route('/api/dag/save_draft', methods=['POST'])
+def api_save_draft():
+    """Saves canvas state without submitting the DAG to the master."""
+    body = request.get_json(force=True, silent=True) or {}
+    dag_name = (body.get('name') or 'my-pipeline').strip()
+    nodes = body.get('nodes', [])
+    edges = body.get('edges', [])
+    if not dag_name:
+        return jsonify({"error": "name required"}), 400
+    _save_constructor_state(dag_name, nodes, edges)
+    return jsonify({"status": "ok", "name": dag_name})
+
+
+@app.route('/api/dag/constructor_states')
+def api_constructor_states():
+    """Returns a list of DAGs that have saved constructor canvas states."""
+    if not os.path.exists(_CONSTRUCTOR_STATES_FILE):
+        return jsonify({"states": []})
+    with open(_CONSTRUCTOR_STATES_FILE) as f:
+        data = json.load(f)
+    states = [{"name": k, "saved_at": v.get("saved_at", 0)} for k, v in data.items()]
+    states.sort(key=lambda x: x["saved_at"], reverse=True)
+    return jsonify({"states": states})
+
+
+@app.route('/api/dag/constructor_state/<dag_name>')
+def api_constructor_state(dag_name):
+    """Returns the saved canvas state (nodes + edges) for a specific DAG."""
+    if not os.path.exists(_CONSTRUCTOR_STATES_FILE):
+        return jsonify({"error": "No saved states"}), 404
+    with open(_CONSTRUCTOR_STATES_FILE) as f:
+        data = json.load(f)
+    if dag_name not in data:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(data[dag_name])
+
+
+_WORKSPACE_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    'titan_workspace', 'shared'
+)
+
+
+@app.route('/api/workspace/files')
+def api_workspace_files():
+    """Returns workspace files sorted by recency, optionally filtered by job name fragments."""
+    q       = request.args.get('q', '').lower()
+    filters = [f.strip() for f in q.split(',') if f.strip()] if q else []
+
+    if not os.path.exists(_WORKSPACE_DIR):
+        return jsonify({"files": []})
+
+    files = []
+    for fname in os.listdir(_WORKSPACE_DIR):
+        fpath = os.path.join(_WORKSPACE_DIR, fname)
+        if not os.path.isfile(fpath) or fname.startswith('.'):
+            continue
+        if filters:
+            # Also match on individual tokens (split on -) so "analyst-airflow"
+            # matches files containing just "airflow" or "analyst"
+            tokens = set(filters)
+            for f in filters:
+                tokens.update(t for t in f.split('-') if len(t) >= 3)
+            if not any(t in fname.lower() for t in tokens):
+                continue
+        stat = os.stat(fpath)
+        _, ext = os.path.splitext(fname)
+        files.append({
+            "name":     fname,
+            "size":     stat.st_size,
+            "modified": int(stat.st_mtime * 1000),
+            "ext":      ext.lower(),
+        })
+
+    files.sort(key=lambda x: x["modified"], reverse=True)
+    return jsonify({"files": files})
+
+
+@app.route('/api/workspace/file/<path:filename>')
+def api_workspace_file(filename):
+    """Serves a single workspace file as a download."""
+    safe = os.path.basename(filename)
+    if not os.path.exists(os.path.join(_WORKSPACE_DIR, safe)):
+        return jsonify({"error": "File not found"}), 404
+    return send_from_directory(_WORKSPACE_DIR, safe, as_attachment=True)
+
+
+@app.route('/api/perm_files')
+def api_perm_files():
+    """Returns a sorted list of .py files currently in the perm_files directory."""
+    perm_dir = os.path.dirname(os.path.abspath(__file__))
+    files = sorted(
+        os.path.basename(p)
+        for p in _glob.glob(os.path.join(perm_dir, '*.py'))
+    )
+    return jsonify({"files": files})
+
+
+@app.route('/api/upload_script', methods=['POST'])
+def api_upload_script():
+    """Uploads a .py file into the perm_files directory."""
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    f = request.files['file']
+    if not f.filename:
+        return jsonify({"error": "Empty filename"}), 400
+    name = secure_filename(f.filename)
+    if not name.endswith('.py'):
+        return jsonify({"error": "Only .py files are accepted"}), 400
+    perm_dir = os.path.dirname(os.path.abspath(__file__))
+    f.save(os.path.join(perm_dir, name))
+    return jsonify({"status": "ok", "filename": name})
 
 
 @app.route('/api/dag/redeploy/<dag_id>', methods=['POST'])
@@ -1795,7 +2132,7 @@ AGENT_RUNS_HTML = SHARED_STYLE + """
 <head><title>Titan — Agent Runs</title><meta http-equiv="refresh" content="3"></head>
 <body>
 <nav class="topnav">
-  <span class="topnav-brand">⚡ TITAN</span>
+  <span class="topnav-brand"><img src="/logo.png" style="height:28px; vertical-align:middle; margin-right:6px;">TITAN</span>
   <a class="tab" href="/">🖥 Orchestrator</a>
   <a class="tab" href="/dags">🔀 DAG Pipelines</a>
   <a class="tab" href="/dags/new">✏️ Constructor</a>
@@ -1964,6 +2301,38 @@ def agent_runs_view():
         status_color = status_color,
         status_text  = status_text,
     )
+
+
+@app.route('/api/worker/launch', methods=['POST'])
+def launch_worker():
+    try:
+        body = request.get_json(force=True)
+        port       = int(body.get('port', 8082))
+        capability = body.get('capability', 'GENERAL').upper()
+        permanent  = bool(body.get('permanent', False))
+
+        if capability not in ('GENERAL', 'GPU', 'HIGH_MEM', 'PYTHON'):
+            return jsonify({'status': 'error', 'error': f'Unknown capability: {capability}'}), 400
+
+        # Resolve JAR path relative to this file (perm_files/ → ../target/)
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        jar_path = os.path.join(base_dir, 'target', 'titan-orchestrator-1.0-SNAPSHOT.jar')
+        if not os.path.exists(jar_path):
+            return jsonify({'status': 'error', 'error': f'JAR not found at {jar_path}'}), 500
+
+        cmd = ['java', '-cp', jar_path, 'titan.TitanWorker',
+               str(port), '127.0.0.1', '9090', capability, str(permanent).lower()]
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return jsonify({'status': 'ok', 'pid': proc.pid, 'port': port, 'capability': capability})
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+
+@app.route('/logo.png')
+def serve_logo():
+    from flask import send_from_directory
+    logo_dir = os.path.dirname(os.path.abspath(__file__))
+    return send_from_directory(logo_dir, 'Titan_logo.png')
 
 
 if __name__ == '__main__':

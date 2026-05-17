@@ -78,6 +78,9 @@ class TitanYAMLParser:
                 titan_type = "TASK"
                 job_port = 0
             
+            hitl_message    = step.get('hitl_message', None)
+            max_wait_seconds = int(step.get('max_wait_seconds', 172800))
+
             job = TitanJob(
                 job_id=job_id,
                 filename=final_filename,
@@ -89,7 +92,9 @@ class TitanYAMLParser:
                 priority=priority,
                 delay=delay_ms,
                 affinity=affinity,
-                requirement=req
+                requirement=req,
+                hitl_message=hitl_message,
+                max_wait_seconds=max_wait_seconds,
             )
             jobs.append(job)
             
