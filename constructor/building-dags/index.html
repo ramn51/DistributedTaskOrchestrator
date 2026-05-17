@@ -11,10 +11,10 @@
       
       
       
-        <link rel="prev" href="../../reference/rpc-spec/">
+        <link rel="prev" href="../overview/">
       
       
-        <link rel="next" href="../internals/">
+        <link rel="next" href="../hitl/">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>System Design - Titan Orchestrator</title>
+        <title>Building DAGs - Titan Orchestrator</title>
       
     
     
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#architecture-system-design" class="md-skip">
+        <a href="#building-dags" class="md-skip">
           Skip to content
         </a>
       
@@ -109,7 +109,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              System Design
+              Building DAGs
             
           </span>
         </div>
@@ -276,11 +276,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../constructor/overview/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../overview/" class="md-tabs__link">
           
   
   
@@ -336,13 +338,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../architecture/design/" class="md-tabs__link">
           
   
   
@@ -906,26 +906,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
             
   
   
@@ -943,7 +948,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -961,7 +966,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../constructor/overview/" class="md-nav__link">
+      <a href="../overview/" class="md-nav__link">
         
   
   
@@ -986,10 +991,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../constructor/building-dags/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building DAGs
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1005,6 +1037,230 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#adding-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding nodes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#node-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Node configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Node configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#job-id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Job ID *
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#script-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Script File *
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#requirement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirement
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#args" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Args
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delay-seconds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delay (seconds)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sticky-scheduling-affinity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sticky Scheduling (affinity)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#port-service-type-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Port (Service type only)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#drawing-edges-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drawing edges (dependencies)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-select" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-select
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#duplicate-a-node" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Duplicate a node
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#undo-redo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Undo / Redo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cycle-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cycle detection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#node-badges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Node badges
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#live-codegen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live codegen
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1017,7 +1273,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../constructor/hitl/" class="md-nav__link">
+      <a href="../hitl/" class="md-nav__link">
         
   
   
@@ -1045,7 +1301,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../constructor/managing-dags/" class="md-nav__link">
+      <a href="../managing-dags/" class="md-nav__link">
         
   
   
@@ -1073,7 +1329,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../constructor/keyboard-shortcuts/" class="md-nav__link">
+      <a href="../keyboard-shortcuts/" class="md-nav__link">
         
   
   
@@ -1475,31 +1731,26 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
             
   
   
@@ -1517,7 +1768,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1532,37 +1783,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    System Design
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../architecture/design/" class="md-nav__link">
         
   
   
@@ -1578,159 +1802,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#deep-dive-l2-diagram" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Deep Dive L2 Diagram
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#1-the-protocol-titan_proto" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. The Protocol (TITAN_PROTO)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#2-internal-mechanics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Internal Mechanics:
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3-state-persistence-data-bus-titanstore" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. State Persistence &amp; Data Bus (TitanStore)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-the-data-plane-file-system" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. The Data Plane (File System)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#5-orchestration-flows" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Orchestration Flows
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="5. Orchestration Flows">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#flow-a-delegated-orchestration-dagster-titan" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Flow A: Delegated Orchestration (Dagster + Titan)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#flow-b-autonomous-orchestration-native-titan" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Flow B: Autonomous Orchestration (Native Titan)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#6-limitations-design-constraints" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6. Limitations &amp; Design Constraints
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="6. Limitations &amp; Design Constraints">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#current-constraints" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current Constraints
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#7-roadmap-to-v20" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        7. Roadmap to v2.0
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1743,7 +1814,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../internals/" class="md-nav__link">
+      <a href="../../architecture/internals/" class="md-nav__link">
         
   
   
@@ -1825,10 +1896,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#deep-dive-l2-diagram" class="md-nav__link">
+  <a href="#adding-nodes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Deep Dive L2 Diagram
+        Adding nodes
       
     </span>
   </a>
@@ -1836,66 +1907,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#1-the-protocol-titan_proto" class="md-nav__link">
+  <a href="#node-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. The Protocol (TITAN_PROTO)
+        Node configuration
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#2-internal-mechanics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Internal Mechanics:
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3-state-persistence-data-bus-titanstore" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. State Persistence &amp; Data Bus (TitanStore)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-the-data-plane-file-system" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. The Data Plane (File System)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#5-orchestration-flows" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Orchestration Flows
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="5. Orchestration Flows">
+    <nav class="md-nav" aria-label="Node configuration">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#flow-a-delegated-orchestration-dagster-titan" class="md-nav__link">
+  <a href="#job-id" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Flow A: Delegated Orchestration (Dagster + Titan)
+        Job ID *
       
     </span>
   </a>
@@ -1903,10 +1930,87 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#flow-b-autonomous-orchestration-native-titan" class="md-nav__link">
+  <a href="#script-file" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Flow B: Autonomous Orchestration (Native Titan)
+        Script File *
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#requirement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirement
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#args" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Args
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delay-seconds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delay (seconds)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sticky-scheduling-affinity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sticky Scheduling (affinity)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#port-service-type-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Port (Service type only)
       
     </span>
   </a>
@@ -1919,38 +2023,76 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#6-limitations-design-constraints" class="md-nav__link">
+  <a href="#drawing-edges-dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. Limitations &amp; Design Constraints
+        Drawing edges (dependencies)
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="6. Limitations &amp; Design Constraints">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#current-constraints" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current Constraints
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#7-roadmap-to-v20" class="md-nav__link">
+  <a href="#multi-select" class="md-nav__link">
     <span class="md-ellipsis">
       
-        7. Roadmap to v2.0
+        Multi-select
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#duplicate-a-node" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Duplicate a node
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#undo-redo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Undo / Redo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cycle-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cycle detection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#node-badges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Node badges
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#live-codegen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live codegen
       
     </span>
   </a>
@@ -1977,208 +2119,190 @@
   
 
 
-<h1 id="architecture-system-design">🏛️ Architecture &amp; System Design</h1>
-<p>Titan follows a <strong>Leader-Follower</strong> topology with a decoupled control plane. It is engineered from first principles to deconstruct the fundamental primitives of distributed orchestration without relying on heavy external frameworks.</p>
-<p><strong>This is the L1 Diagram with highest level of abstraction.</strong></p>
-<p>There will be a single Master, Master is the single point of contact for the user, worker and the titan store.</p>
-<ul>
-<li>
-<p>Users can submit jobs either as a YAML or a Python script through TitanSDK.</p>
-</li>
-<li>
-<p>Scheduler routes to the Worker node (either based on load or capability as per definition). </p>
-</li>
-<li>
-<p>Workers are spawned independently and gets registered to the Scheduler. Scheduler will not have predefined information about the workers. (gets updated only on registration).</p>
-</li>
-<li>
-<p>Scheduler uses TitanStore to trace the state of the system and for recovery replay. Tasks will communicate through Scheduler to use the Titan Store. </p>
-</li>
-<li>
-<p>Titan Store is accessed only by Scheduler instance and is single point of communication.</p>
-</li>
-</ul>
-<blockquote>
-<p>Scheduler for now is SPOF (Single point of failure).</p>
-</blockquote>
-<pre class="mermaid"><code>flowchart LR
-    subgraph Clients["User / Clients"]
-        direction TB
-        SDK["Python SDK Agent"]
-        YAML["YAML Pipeline"]
-        Dash["Web Dashboard"]
-    end
-
-    subgraph ControlPlane["Titan Control Plane"]
-        Master["Titan Master"]
-    end
-
-    subgraph DataLayer["State &amp; Persistence"]
-        Store[("Titan Store&lt;br&gt;(Optional)")]
-    end
-
-    subgraph Grid["Compute Grid"]
-        direction TB
-        W1["Worker Node"]
-        W2["Worker Node"]
-        W3["Worker Node"]
-    end
-
-    SDK -- "Submit Job" --&gt; Master
-    YAML -- "Submit Job" --&gt; Master
-
-    Master -- "Distribute" --&gt; W1
-    Master -- "Distribute" --&gt; W2
-    Master -- "Distribute" --&gt; W3
-
-    W1 -. "Data Bus (IPC)" .-&gt; Master
-    W2 -. "Data Bus (IPC)" .-&gt; Master
-    W3 -. "Data Bus (IPC)" .-&gt; Master
-
-    Master -. "Stream Stats" .-&gt; Dash
-    W1 -. "Live Logs" .-&gt; Master
-
-    Master &lt;--&gt;|"AOF / State / Data Bus"| Store
-
-    classDef optional fill:#f9f9f9,stroke:#333,stroke-dasharray: 5 5;
-    class Store optional;</code></pre>
-<h2 id="deep-dive-l2-diagram">Deep Dive L2 Diagram</h2>
-<p><img alt="Titan High Level Architecture" src="../../screenshots/Titan_L2_with_Store.png" /></p>
-<blockquote>
-<p><strong>Network Topology:</strong> Titan currently assumes a flat network address space (LAN/VPC). While it can run on Cloud VMs (EC2/GCP), it requires direct TCP connectivity between nodes. </p>
-</blockquote>
+<h1 id="building-dags">Building DAGs</h1>
+<h2 id="adding-nodes">Adding nodes</h2>
+<p>Click <strong>+ Add Task</strong> or <strong>+ Add Service</strong> in the topbar. Each click places a new node on the canvas at an auto-calculated position. Nodes snap to a 20px grid.</p>
+<p><img alt="A new task node on the canvas with the Configure Node sidebar open" src="../../screenshots/constructor_first_node.png" /></p>
 <hr />
-<h2 id="1-the-protocol-titan_proto">1. The Protocol (<code>TITAN_PROTO</code>)</h2>
-<p>Titan does not rely on HTTP/REST or heavy gRPC layers. Communication happens over raw TCP sockets using a fixed-header framing strategy to ensure integrity and prevent packet fragmentation. </p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>[ HEADER (8 Bytes) ]
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>| Version (1B) | OpCode (1B) | Flags (1B) | Spare (1B) | Payload Length (4B) |
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>[ BODY ]
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>| Binary Payload (Variable) ... |
-</span></code></pre></div>
-<p>This ensures lightning-fast IPC (Inter-Process Communication) with very less latency and zero JSON-serialization overhead for the core execution loops.</p>
-<h2 id="2-internal-mechanics">2. Internal Mechanics:</h2>
-<p>The Master Node: The Master acts as the Scheduler and Control Plane. It utilizes specialized threads to manage the cluster efficiently.</p>
+<h2 id="node-configuration">Node configuration</h2>
+<p>Select a node to open the sidebar. Every field maps directly to a <code>TitanJob</code> property.</p>
+<h3 id="job-id">Job ID <code>*</code></h3>
+<p>Unique identifier for this job within the DAG. Used in dependency wiring, logs, and the visualizer.</p>
 <ul>
-<li>
-<p><strong>Inverted Worker Registration (Push-Based Discovery)</strong></p>
-<p>Unlike traditional systems that scan for nodes, Titan uses a Push-Based Discovery model. Workers initiate the connection to the Master, allowing dynamic scaling behind NATs or firewalls without static IP configuration.</p>
-</li>
-<li>
-<p><strong>Queue Segregation (Waiting vs. Active)</strong></p>
-<p>To process complex DAGs efficiently, Titan separates tasks by readiness. Jobs with unresolved parent dependencies are never placed in the active loop; instead, they sit in a blocked Waiting Queue. Once a parent task succeeds, a state-transition event instantly unlocks the dependent children, moving them into the ActiveJobQueue for immediate execution.</p>
-</li>
-<li>
-<p><strong>Smart Dispatching: Capability &amp; Affinity Routing</strong></p>
-<p>When popping a job from the ActiveJobQueue, the Master executes a two-phase routing algorithm before dispatching the payload:</p>
-<blockquote>
-<p><strong>Capability-Based Routing:</strong> The scheduler checks the job's requirement tag (e.g., GPU, HIGH_MEM) and strictly matches it against the registered hardware tags of the current worker pool. A GPU task will bypass idle GENERAL nodes until a capable node is free.</p>
-<p><strong>Affinity-Based Routing:</strong> If a task requires strict data locality (flagged with affinity: true), the Master queries TitanStore to find the exact physical node that executed the parent task. The child task is then routed exclusively to that node to leverage local filesystem caches and avoid network data transfers.</p>
-</blockquote>
-</li>
-<li>
-<p><strong>The "ClockWatcher"</strong></p>
-<p>Instead of inefficient polling, Titan uses a dedicated thread monitoring a DelayQueue to handle future tasks. This ensures $O(\log n)$ scheduling efficiency, consuming zero CPU cycles until the precise millisecond a job is ready.</p>
-</li>
-<li>
-<p><strong>Reconciliation Loop</strong></p>
-<p>A background ScalerExecutor runs every 15 seconds to compare the ActiveJobQueue against WorkerCapacity. If the delta is too high, it triggers the Auto-Scaler. It calculates saturation per capability pool (e.g., GENERAL vs. GPU) to ensure scaling only happens when a specific resource type is exhausted.</p>
-</li>
-<li>
-<p><strong>The Failure Detector (Heartbeats)</strong></p>
-<p>The Master maintains a dedicated HeartBeatExecutor. It tracks the "Last Seen" timestamp of every worker. If a worker goes silent for &gt;30s, it is marked DEAD, and its active jobs are immediately re-queued to healthy nodes to guarantee execution resilience.</p>
-</li>
-<li>
-<p><strong>Dead Letter Queue (DLQ) &amp; Poison Pills</strong></p>
-<p>If a task repeatedly crashes a worker or fails beyond its maximum retry threshold (e.g., due to a syntax error or a missing system library), it is safely removed from the execution loop to prevent infinite crash-looping. The Master quarantines these "poison pill" tasks in a Dead Letter Queue (DLQ), preserving their logs and state for operator inspection without stalling the rest of the cluster.</p>
-</li>
+<li>Must be unique across all nodes in the canvas</li>
+<li>Alphanumeric, hyphens and underscores allowed</li>
+<li>Example: <code>preprocess</code>, <code>train-gpu</code>, <code>comp-synthesizer</code></li>
 </ul>
-<hr />
-<h2 id="3-state-persistence-data-bus-titanstore">3. State Persistence &amp; Data Bus (TitanStore)</h2>
-<p>To eliminate the Master as a single point of failure and provide a unified state layer, Titan implements a custom in-memory data store backed by Redis primitives (RedisJava).</p>
-<p><strong>Append-Only File (AOF):</strong> </p>
-<p>Every critical system transition (e.g., Node Locked, Job Dispatched, Worker Registered) is written to a persistent log on disk.</p>
-<p><strong>Crash Recovery:</strong> </p>
-<p>If the Master process is killed abruptly, it does not lose the cluster state. Upon restart, it reads the AOF, reconstructs the ActiveJobQueue, and resumes the DAG exactly where it left off.</p>
-<p><strong>Distributed Data Passing:</strong> </p>
-<p>Tasks can write intermediate results or metadata to the store, allowing downstream tasks to fetch them seamlessly across completely different physical nodes.</p>
-<p><strong>Dynamic State Tracking:</strong> </p>
-<p>Individual tasks can update their own custom progress metrics, flags, or statuses during execution. This allows the Python SDK or the UI Dashboard to query the real-time progress of a remote script while it is still running.</p>
-<h2 id="4-the-data-plane-file-system">4. The Data Plane (File System)</h2>
-<p>Titan strictly separates "Source Artifacts" from "Runtime State" to ensure reproducibility.</p>
+<h3 id="script-file">Script File <code>*</code></h3>
+<p>The Python script that runs on the worker. Select from the dropdown (lists all files in <code>perm_files/</code>) or click <strong>+ Upload</strong> to add a new script without leaving the constructor.</p>
+<p>Uploaded scripts are saved to <code>perm_files/</code> and immediately available in the dropdown.</p>
+<h3 id="type">Type</h3>
 <table>
 <thead>
 <tr>
-<th style="text-align: left;">Directory</th>
-<th style="text-align: left;">Role</th>
-<th style="text-align: left;">Description</th>
+<th>Value</th>
+<th>Behaviour</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><strong><code>TitanStore (Redis) (Optional)</code></strong></td>
-<td style="text-align: left;"><strong>Global State</strong></td>
-<td style="text-align: left;">In-memory data structure store backed by an AOF. Stores job statuses, DAG locks, Task  and worker heartbeats. Can be used by tasks as a store as well.</td>
+<td><code>run</code></td>
+<td>Script runs once and exits. Job completes when process exits 0.</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong><code>perm_files/</code></strong></td>
-<td style="text-align: left;"><strong>Artifact Registry</strong></td>
-<td style="text-align: left;">The "Source of Truth." Place your scripts (<code>.py</code>, <code>.sh</code>) and binaries (<code>.jar</code>) here.<br><br><em>Note: SDK/YAML submissions automatically stage files here, but you can also manually drop files in.</em></td>
-</tr>
-<tr>
-<td style="text-align: left;"><strong><code>titan_workspace/</code></strong></td>
-<td style="text-align: left;"><strong>Execution Sandbox</strong></td>
-<td style="text-align: left;">The runtime staging area.<br><br>• <strong><code>jobs/{id}/</code></strong>: Contains execution logs (<code>.log</code>) and isolated script copies for specific jobs.<br>• <strong><code>shared/</code></strong>: A "Data Bus" directory allowing dependent DAG tasks to share intermediate files.</td>
+<td><code>service</code></td>
+<td>Process stays alive. Master tracks it as a long-running service.</td>
 </tr>
 </tbody>
 </table>
+<h3 id="requirement">Requirement</h3>
+<p>Routes the job to a worker with matching capability. See <a href="../overview/#capability-routing">capability routing</a>.</p>
+<h3 id="args">Args</h3>
+<p>Command-line arguments passed to the script at launch.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a># Script receives: python train.py --epochs 10 --lr 0.001
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>args: --epochs 10 --lr 0.001
+</span></code></pre></div>
+<p>For positional args, order matters and must match the script's <code>sys.argv</code> expectations.</p>
+<h3 id="priority">Priority</h3>
+<p>Integer 1–10. Higher priority jobs are dispatched first when multiple jobs are queued on the same worker. Default: <code>1</code>.</p>
+<h3 id="delay-seconds">Delay (seconds)</h3>
+<p>Wait this many seconds after all dependencies clear before dispatching. Useful for rate limiting or allowing a service to fully start before dependent jobs connect to it. Default: <code>0</code>.</p>
+<h3 id="sticky-scheduling-affinity">Sticky Scheduling (affinity)</h3>
+<p>When enabled, forces this job to run on the <strong>same worker</strong> that ran its parent job. Useful when jobs share local disk state.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Do not combine <code>affinity: true</code> with a <code>requirement</code> that differs from the parent job's worker capability. The scheduler needs a worker that satisfies both constraints — if none exists, the job waits indefinitely.</p>
+</div>
+<h3 id="port-service-type-only">Port <em>(Service type only)</em></h3>
+<p>The port the service process listens on. Recorded by the master for service discovery.</p>
 <hr />
-<h2 id="5-orchestration-flows">5. Orchestration Flows</h2>
-<p>Titan handles both delegated and autonomous orchestration.</p>
-<h3 id="flow-a-delegated-orchestration-dagster-titan"><strong>Flow A: Delegated Orchestration (Dagster + Titan)</strong></h3>
-<p>Dagster holds the logical execution graph and delegates physical execution to Titan via a synchronous polling loop.</p>
-<p><img alt="Dagster to Titan Sequence" src="../../screenshots/Dagster_Titan_Sequence.png" /></p>
-<h3 id="flow-b-autonomous-orchestration-native-titan"><strong>Flow B: Autonomous Orchestration (Native Titan)</strong></h3>
-<p>The Python SDK submits the entire DAG in one atomic binary payload. The Titan Master handles the complete state machine (Wait -&gt; Unlock -&gt; Dispatch) internally.</p>
-<p><img alt="Titan Only Sequence" src="../../screenshots/Titan_only_Sequence.png" /></p>
-<h2 id="6-limitations-design-constraints">6. Limitations &amp; Design Constraints</h2>
-<p>Titan is a research runtime designed to explore the <strong>primitives of orchestration</strong> (Scheduling, IPC, State Management) without the complexity of existing frameworks. As such, certain "Production" features are explicitly out of scope for V1:</p>
-<h3 id="current-constraints">Current Constraints</h3>
+<h2 id="drawing-edges-dependencies">Drawing edges (dependencies)</h2>
+<p>An edge from node A to node B means: <strong>B will not start until A has completed successfully.</strong></p>
+<p>To draw an edge:</p>
 <ol>
-<li>
-<p><strong>Security (Open TCP):</strong></p>
-<ul>
-<li>The current implementation uses raw, unencrypted TCP sockets.</li>
-<li><em>Constraint:</em> Do not run Titan on public networks (WAN) without a VPN or SSH Tunnel. Use strictly within a trusted VPC/LAN.</li>
-</ul>
-</li>
-<li>
-<p><strong>Process Failover:</strong></p>
-<ul>
-<li>While data is safe, the Master is currently a singleton process. If it crashes, workers cannot receive new instructions until it reboots. High Availability (HA) via Raft Consensus (Leader Election) is planned for the v2.0 Roadmap to achieve true zero-downtime failover.</li>
-</ul>
-</li>
-<li>
-<p><strong>Network Topology:</strong></p>
-<ul>
-<li>Titan assumes a flat address space (all nodes can ping each other via IP). It does not currently handle NAT Traversal or complex Subnet routing.</li>
-</ul>
-</li>
-<li>
-<p><strong>Scaling Boundary (Process vs. Infrastructure):</strong></p>
-<ul>
-<li>Titan implements <strong>Application-Level Scaling</strong> (spawning new JVM worker processes on existing hardware).</li>
-<li><strong>Infrastructure Provisioning</strong> is currently delegated to external tools.</li>
-<li><em>Roadmap Item:</em> A "Cluster Autoscaler Interface" (Webhooks) is planned for v2.0, allowing Titan to trigger external APIs (e.g., Azure VM Scale Sets) when the cluster runs out of capacity.</li>
-</ul>
-</li>
+<li>Hover over the source node — a port (<strong>●</strong>) appears on its right edge</li>
+<li>Click and drag from the port</li>
+<li>Release over the target node</li>
+<li>A blue curved arrow confirms the dependency</li>
 </ol>
-<h2 id="7-roadmap-to-v20">7. Roadmap to v2.0</h2>
-<p><strong>Security &amp; Auth:</strong> Implement mTLS (Mutual TLS) for encrypted, authenticated communication.</p>
-<p><strong>Distributed Consensus:</strong> Implement Raft/Paxos for Leader Election (Removing Master SPOF).</p>
-<p><strong>Containerization:</strong> Support for Docker execution drivers for true filesystem isolation (currently uses Process-Level isolation).</p>
-<p><strong>Cluster Autoscaler Webhooks:</strong> Allow Titan to trigger external APIs (e.g., Azure VM Scale Sets) to provision bare metal automatically.</p>
-<p><strong>Human-in-the-loop Webhooks:</strong> Allow Titan to trigger a HIL hooks to proceed in the DAG further, this should pause the DAG and its execution states and resume based on approval.</p>
+<p>To delete an edge: click it (it turns orange/dashed) then press <code>Delete</code> or use the sidebar Delete Edge button.</p>
+<p><img alt="Orange dashed dependency arrow connecting two nodes" src="../../screenshots/constructor_arrow.png" /></p>
+<hr />
+<h2 id="multi-select">Multi-select</h2>
+<p>Drag on <strong>empty canvas</strong> to draw a blue selection rectangle. All nodes within the box are selected.</p>
+<ul>
+<li><strong>Shift+click</strong> a node to add or remove it from the current selection</li>
+<li>Drag any selected node to move the whole group</li>
+<li><code>Delete</code> / <code>Backspace</code> removes all selected nodes and their edges at once</li>
+</ul>
+<p>When multiple nodes are selected the sidebar shows a multi-select panel instead of node config. Click a single node to edit it individually.</p>
+<hr />
+<h2 id="duplicate-a-node">Duplicate a node</h2>
+<p>Select a node and press <strong>Ctrl+D</strong> (or click <strong>Copy</strong> in the sidebar header). The duplicate appears offset by 40px with <code>-copy</code> appended to the Job ID. All field values are cloned.</p>
+<hr />
+<h2 id="undo-redo">Undo / Redo</h2>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Shortcut</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Undo</td>
+<td><code>Ctrl+Z</code></td>
+</tr>
+<tr>
+<td>Redo</td>
+<td><code>Ctrl+Y</code> or <code>Ctrl+Shift+Z</code></td>
+</tr>
+</tbody>
+</table>
+<p>Undo/Redo tracks structural changes: add node, delete node, add edge, delete edge, duplicate. Drag position changes are not tracked.</p>
+<p>The <strong>↩ ↪</strong> buttons in the topbar are disabled (greyed) when there is nothing to undo or redo.</p>
+<hr />
+<h2 id="cycle-detection">Cycle detection</h2>
+<p>Before deploying, the constructor runs a DFS cycle check on the edge graph. If a cycle is detected (e.g. A → B → A), deploy is blocked with a <strong>"Cycle detected — check your dependencies."</strong> error.</p>
+<p>Titan's execution model does not support cycles in a DAG. Loops and conditional re-runs are expressed at the orchestrator layer, not inside the DAG structure. See <a href="../../architecture/design/">Architecture</a> for the agentic loop pattern.</p>
+<hr />
+<h2 id="node-badges">Node badges</h2>
+<p>Nodes display small badges for at-a-glance status:</p>
+<table>
+<thead>
+<tr>
+<th>Badge</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>HITL</code> (yellow)</td>
+<td>A human approval gate is configured after this job</td>
+</tr>
+<tr>
+<td><code>svc</code> (blue)</td>
+<td>Service type node</td>
+</tr>
+<tr>
+<td><code>sticky</code> (orange)</td>
+<td>Affinity enabled</td>
+</tr>
+<tr>
+<td><code>p:N</code> (blue)</td>
+<td>Priority above 1</td>
+</tr>
+</tbody>
+</table>
+<p>The node border colour reflects its capability requirement (green = GENERAL, purple = GPU, blue = HIGH_MEM, orange = PYTHON).</p>
+<hr />
+<h2 id="live-codegen">Live codegen</h2>
+<p>The <strong>Output panel</strong> at the bottom of the canvas shows YAML and Python SDK equivalents of the current canvas, updated live.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">YAML</label><label for="__tabbed_1_2">Python SDK</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ml-pipeline&quot;</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">project</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">jobs</span><span class="p">:</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;preprocess&quot;</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;run&quot;</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;preprocess.py&quot;</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;dataset-001&quot;</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;train&quot;</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;run&quot;</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;train.py&quot;</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="nt">requirement</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;GPU&quot;</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="nt">priority</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;preprocess&quot;</span><span class="p p-Indicator">]</span>
+</span></code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">titan_sdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">TitanClient</span><span class="p">,</span> <span class="n">TitanJob</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">client</span> <span class="o">=</span> <span class="n">TitanClient</span><span class="p">()</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">preprocess</span> <span class="o">=</span> <span class="n">TitanJob</span><span class="p">(</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">job_id</span><span class="o">=</span><span class="s2">&quot;preprocess&quot;</span><span class="p">,</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;preprocess.py&quot;</span><span class="p">,</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">args</span><span class="o">=</span><span class="s2">&quot;dataset-001&quot;</span><span class="p">,</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="p">)</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">train</span> <span class="o">=</span> <span class="n">TitanJob</span><span class="p">(</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    <span class="n">job_id</span><span class="o">=</span><span class="s2">&quot;train&quot;</span><span class="p">,</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;train.py&quot;</span><span class="p">,</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="n">requirement</span><span class="o">=</span><span class="s2">&quot;GPU&quot;</span><span class="p">,</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="n">priority</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>    <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;preprocess&quot;</span><span class="p">],</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="p">)</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="n">client</span><span class="o">.</span><span class="n">submit_dag</span><span class="p">(</span><span class="s2">&quot;ml-pipeline&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">preprocess</span><span class="p">,</span> <span class="n">train</span><span class="p">])</span>
+</span></code></pre></div>
+</div>
+</div>
+</div>
+<p>Click <strong>Copy</strong> to copy the current tab's content to clipboard.</p>
 
 
 
