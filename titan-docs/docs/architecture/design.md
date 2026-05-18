@@ -2,21 +2,9 @@
 
 Titan follows a **Leader-Follower** topology with a decoupled control plane. It is engineered from first principles to deconstruct the fundamental primitives of distributed orchestration without relying on heavy external frameworks.
 
-**This is the L1 Diagram with highest level of abstraction.**
+The diagram below shows the highest-level view. A single Master acts as the sole control plane: it accepts job submissions from clients, routes tasks to worker nodes based on load and capability, and uses TitanStore for state persistence and crash recovery. Workers register themselves to the Master on startup — the Master holds no static worker configuration.
 
-There will be a single Master, Master is the single point of contact for the user, worker and the titan store.
-
-- Users can submit jobs either as a YAML or a Python script through TitanSDK.
-
-- Scheduler routes to the Worker node (either based on load or capability as per definition). 
-
-- Workers are spawned independently and gets registered to the Scheduler. Scheduler will not have predefined information about the workers. (gets updated only on registration).
-
-- Scheduler uses TitanStore to trace the state of the system and for recovery replay. Tasks will communicate through Scheduler to use the Titan Store. 
-
-- Titan Store is accessed only by Scheduler instance and is single point of communication.
-
-> Scheduler for now is SPOF (Single point of failure).
+> **Note:** The Master is currently a Single Point of Failure (SPOF). Raft-based leader election is on the v2 roadmap.
 
 ```mermaid
 flowchart LR
@@ -82,7 +70,7 @@ Titan does not rely on HTTP/REST or heavy gRPC layers. Communication happens ove
 | Binary Payload (Variable) ... |
 ```
 
-This ensures lightning-fast IPC (Inter-Process Communication) with very less latency and zero JSON-serialization overhead for the core execution loops.
+This ensures low-latency IPC (Inter-Process Communication) with zero JSON-serialization overhead for the core execution loops.
 
 
 ## 2. Internal Mechanics: 
@@ -211,6 +199,4 @@ Titan is a research runtime designed to explore the **primitives of orchestratio
 
 **Containerization:** Support for Docker execution drivers for true filesystem isolation (currently uses Process-Level isolation).
 
-**Cluster Autoscaler Webhooks:** Allow Titan to trigger external APIs (e.g., Azure VM Scale Sets) to provision bare metal automatically.
-
-**Human-in-the-loop Webhooks:** Allow Titan to trigger a HIL hooks to proceed in the DAG further, this should pause the DAG and its execution states and resume based on approval.
+**Cluster Autoscaler Webhooks:** Allow Titan to trigger external APIs (e.g., Azure VM Scale Sets) to provision bare metal automatically when queues saturate.

@@ -1,0 +1,47 @@
+title: "[Idea] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Propose a feature, improvement, or architectural change.
+        Check the [v2.0 Roadmap](https://ramn51.github.io/titan-orchestrator/#roadmap-to-v20) first — if your idea is already there, feel free to comment on implementation approach instead.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the gap or friction you're hitting. Real use cases are more useful than abstract feature requests.
+      placeholder: "When I deploy a GPU worker on RunPod and the SSH tunnel drops, the Master keeps dispatching jobs to the dead worker instead of requeueing them..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you want Titan to do? Rough ideas are fine — you don't need a full design.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Which capability tier does this affect?
+      options:
+        - T1 — Distributed Task Scheduler
+        - T2 — Service Orchestrator
+        - T3 — Agentic Runtime
+        - Cross-cutting (SDK, dashboard, CLI)
+        - Infrastructure (deployment, packaging)
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Are you interested in implementing this?
+      options:
+        - label: Yes, I'd like to contribute a PR for this
+        - label: I can help design/review but not implement
+        - label: Just raising the idea

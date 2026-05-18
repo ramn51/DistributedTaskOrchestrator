@@ -1904,6 +1904,26 @@ def api_upload_script():
     return jsonify({"status": "ok", "filename": name})
 
 
+@app.route('/api/manifest/sync', methods=['POST'])
+def api_manifest_sync():
+    """Accepts a manifest payload from a remote SDK client and merges it into the local manifest."""
+    manifest_path = ".titan_dag_manifest.json"
+    try:
+        incoming = request.get_json(force=True)
+        if not incoming:
+            return jsonify({"error": "Empty payload"}), 400
+        existing = {}
+        if os.path.exists(manifest_path):
+            with open(manifest_path) as f:
+                existing = json.load(f)
+        existing.update(incoming)
+        with open(manifest_path, 'w') as f:
+            json.dump(existing, f, indent=2)
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/dag/redeploy/<dag_id>', methods=['POST'])
 def api_dag_redeploy(dag_id):
     """Re-submits a DAG by replaying the stored payload from the manifest."""

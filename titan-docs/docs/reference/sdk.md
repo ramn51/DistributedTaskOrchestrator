@@ -190,5 +190,10 @@ client = TitanClient()
 client.get_artifact(f"run:{run_id}:report", save_path=f"/tmp/report_{run_id}.md")
 ```
 
-!!! note "Worker workspace is local to the worker node"
-    `titan_workspace/shared` exists on the worker node, not on the master or orchestrator. `publish_artifact` is the correct way to move files across nodes. Do not assume the orchestrator can read files written by workers directly.
+!!! warning "Remote workers must upload files explicitly"
+    `titan_workspace/shared` is **local to the worker node**. For local workers (same machine as Master) files appear in the Dashboard automatically. For **remote workers** (RunPod, GCP, SSH tunnel), files written to disk stay on the remote machine and will never appear in Dashboard → Workspace Files unless explicitly uploaded.
+
+    Use `upload_file` for simple downloads from the Dashboard, or `publish_artifact` / `get_artifact` when the orchestrator needs to read the file programmatically:
+
+    - `upload_file("output.txt")` — file appears in Dashboard Workspace Files, downloadable by a human
+    - `publish_artifact(key, "output.txt")` — file uploaded and registered in TitanStore; retrieve with `get_artifact(key)` from the orchestrator

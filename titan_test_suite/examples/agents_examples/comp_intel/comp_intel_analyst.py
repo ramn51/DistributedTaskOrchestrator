@@ -85,17 +85,13 @@ Be direct, specific, and avoid marketing language. Aim for ~250 words."""
 
     result = response.text.strip()
 
-    # Write result to shared workspace — reliable, no TitanStore dependency
-    out_dir  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shared")
-    os.makedirs(out_dir, exist_ok=True)
-    out_file = os.path.join(out_dir, f"intel_{run_id}_result_{idx}.txt")
-
-    with open(out_file, "w") as f:
-        f.write(f"FRAMEWORK:{framework}\n")
-        f.write(result)
+    # Write result to TitanStore — works across any worker node
+    from titan_sdk import TitanClient
+    store = TitanClient()
+    store.store_put(f"intel_{run_id}_result_{idx}", f"FRAMEWORK:{framework}\n{result}")
 
     print(f"[ANALYST-{idx}] Analysis complete — {len(result)} chars", flush=True)
-    print(f"[ANALYST-{idx}] Saved → intel_{run_id}_result_{idx}.txt", flush=True)
+    print(f"[ANALYST-{idx}] Saved → TitanStore key: intel_{run_id}_result_{idx}", flush=True)
     print(f"\n--- {framework} Preview ---", flush=True)
     print(result[:300] + ("..." if len(result) > 300 else ""), flush=True)
     print(f"----------------------------\n", flush=True)

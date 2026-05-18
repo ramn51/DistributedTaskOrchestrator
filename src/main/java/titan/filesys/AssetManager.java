@@ -21,7 +21,7 @@ import java.util.Base64;
 
 public class AssetManager {
 
-    private static final String STORAGE_DIR = "perm_files";
+    private static final String STORAGE_DIR = "uploads";
 
     public static class ArchiveInfo {
         public final String zipName;

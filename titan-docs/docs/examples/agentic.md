@@ -4,20 +4,9 @@ While YAML is excellent for static, predictable pipelines, modern infrastructure
 
 The **Titan Python SDK** allows you to break out of static configurations and use standard Python code to generate execution graphs programmatically. This enables everything from simple conditional logic to fully autonomous AI agents that generate their own execution paths at runtime.
 
-To execute the scripts if you have installed the sdk globally with `pip install -e .` then, you can simply run it as `python <script_name>.py`
+Once the SDK is installed (`pip install -e .`), run any example script directly with `python <script_name>.py`.
 
-For direct examples to run check out these:
-
-**For Agentic:**
-
-`titan_test_suite/examples/agents_examples/research_agent/research_agent.py`
-`titan_test_suite/examples/agents_examples/code_gen_agent/code_gen_agent.py`
-`titan_test_suite/examples/agents_examples/research_pipeline/research_pipeline.py`
-
-**For Deterministic:**
-
-`titan_test_suite/examples/dynamic_dag_custom/dynamic_dag_switch`
-`titan_test_suite/examples/worker_skill_based_test/gpu_project_test`
+The examples live in `titan_test_suite/examples/` — agentic examples under `agents_examples/`, static DAG examples under `yaml_based_static_tests/` and `dynamic_dag_custom/`. See the [full worked examples table](#full-worked-examples) below.
 
 ---
 

@@ -1,0 +1,39 @@
+title: "[Q&A] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask anything about using Titan — setup, SDK usage, pipeline design, debugging.
+        Check the [docs](https://ramn51.github.io/titan-orchestrator/) and open issues first.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: What are you trying to do?
+      description: Describe your goal and what you've tried so far.
+      placeholder: "I'm trying to route GPU jobs to a remote RunPod worker, but jobs keep dispatching to my local GENERAL worker..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: setup
+    attributes:
+      label: Your setup
+      description: How is your cluster configured?
+      placeholder: |
+        - Titan version / commit:
+        - Master: local Mac / cloud VM / other
+        - Workers: how many, what types
+        - Submission method: SDK / YAML / Constructor
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or error output
+      description: Paste any master.log lines, SDK output, or tracebacks.
+      render: shell
+    validations:
+      required: false

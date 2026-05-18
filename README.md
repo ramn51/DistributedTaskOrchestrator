@@ -1,38 +1,57 @@
-# 🛰️ Titan: The Hybrid Distributed Runtime
+<p align="center">
+  <img src="screenshots/Titan_logo.png" alt="Titan Orchestrator Logo" width="300">
+</p>
 
-**Self-Hosting, Self-Healing Execution Substrate for DAGs, Agents, and Services.**
+# Titan Orchestrator
 
+**Self-hosted distributed runtime for DAGs, Agents, and Services.**
 
 [![Documentation](https://img.shields.io/badge/docs-live-1de9b6.svg)](https://ramn51.github.io/titan-orchestrator/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+![Status: Experimental](https://img.shields.io/badge/Status-Experimental_Research-blue)
+![Built by: 1 Developer](https://img.shields.io/badge/Solo_Project-Ram_Narayanan-brightgreen)
 
-Titan is a zero-dependency distributed runtime built from first principles to solve the **"Physical Execution"** problem. It bridges the gap between static orchestrators (Airflow), dynamic AI agents, and long-running micro-services.
+Titan is a zero-dependency distributed runtime built from first principles to solve the **Physical Execution** problem. It bridges the gap between static orchestrators (Airflow), dynamic AI agents, and long-running micro-services.
+
+**What Titan can run:**
+
+- **Static Pipelines** — deterministic ETL, DevOps, and reporting workflows
+- **Long-Running Services** — persistent APIs and servers with auto-restart
+- **Runtime-Defined DAGs** — execution graphs built on-the-fly via logic
+- **Agentic Workflows** — complex graphs generated and mutated dynamically by LLMs
+- **Human-in-the-Loop Pipelines** — DAGs that pause at checkpoints and wait for a human Approve/Reject before continuing
+
+---
 
 ## Built-In Dashboard
-Titan includes a lightweight Python Flask dashboard to visualize cluster health, monitor worker load, and stream stdout/stderr from distributed jobs in real-time.
 
-![Titan Dashboard](screenshots/UI_Screenshot.png)
-![Log Streaming](screenshots/Log_Stream.png)
+Titan ships with a lightweight Python Flask dashboard with three views:
 
-**What can Titan run?**
+### Orchestrator — Cluster health and worker load
 
-**Static Pipelines:** Deterministic ETL and DevOps workflows.
-**Long-Running Services:** Persistent APIs and servers with auto-restart.
-**Runtime-Defined DAGs:** Execution graphs built on-the-fly via logic.
-**Agentic Workflows:** Complex graphs generated dynamically by LLMs.
+![Titan Orchestrator Dashboard](screenshots/dashboard_orchestrator.png)
 
-**Titan handles the heavy lifting of distributed systems:**
-*  **Parallelism:** Executing massive fan-out workloads across the cluster with non-blocking task distribution.
-*  **Locality:** Enforcing strict data-to-node affinity.
-*  **Elasticity:** Reactive auto-scaling with autonomous "Inception" events.
-*  **Resilience:** Zero-loss state recovery via the integrated TitanStore AOF.
-*  **Capability:** Hardware-aware routing (Strict GPU vs. CPU matching).
+Real-time view of every connected worker node — capability tag (GENERAL / GPU / HIGH_MEM), current load, active job, running services, and recent activity. Includes a **+ Launch Worker** button to spin up new worker nodes from the browser.
 
-### 📖 [Explore the Full Documentation and Quickstart](https://ramn51.github.io/titan-orchestrator/getting-started/)
+### DAG Pipelines — Visual pipeline monitor
 
-<p align="center">
-  <img src="./screenshots/Titan_L1_diagram_final.png" alt="Titan High Level Architecture" width="800"/>
-</p>
+![DAG Visualizer](screenshots/visualizer_overview.png)
+
+Every pipeline submitted to the cluster — via CLI, SDK, YAML, or the visual Constructor — is automatically rendered as a live dependency graph. Node colours update in real-time as jobs move through `PENDING → RUNNING → COMPLETED / FAILED`. Click any node to stream its stdout/stderr live.
+
+### DAG Constructor — Visual pipeline builder
+
+![DAG Constructor](screenshots/constructor_overview.png)
+
+Browser-based drag-and-drop DAG editor. Add task and service nodes, draw dependency edges, configure script, capability, args, priority, and HITL gates per node — then deploy directly to the cluster with one click. Auto-generates equivalent Python SDK and YAML as you build. Includes undo/redo, multi-select, autosave, and cycle detection.
+
+### Agent Runs — Multi-stage agent timeline
+
+![Agent Runs](screenshots/visualizer_agent_runs.png)
+
+Groups all DAG stages that share an `agent_run_id` into a single timeline row. When an agent runs iteratively (PLAN → ITER → EVAL → SYNTH), each stage is a separate DAG submission — Agent Runs reconstructs the full lifecycle so you don't have to hunt through individual DAG entries.
+
+> Flask is the only external dependency. The core engine has zero external dependencies.
 
 ---
 
@@ -40,12 +59,14 @@ Titan includes a lightweight Python Flask dashboard to visualize cluster health,
 
 Titan scales with your complexity, from a simple script runner to an autonomous agent host:
 
-1. **Level 1: Distributed Cron (The Scheduler)**
-   * Distributed `crontab` for Python/Shell scripts. Run tasks in sequence or parallel across a cluster.
-2. **Level 2: Service Orchestrator (The Platform)**
-   * Self-hosted Micro-PaaS (like Nomad or PM2). Deploy APIs and keep them alive with auto-restarts on crash.
+1. **Level 1: Distributed Task Scheduler**
+   Run Python/Shell scripts in sequence or parallel across a cluster. On-demand and delayed execution — cron-style recurring schedules are on the v2 roadmap.
+
+2. **Level 2: Service Orchestrator**
+   Deploy long-running APIs and services as permanent workers. Workers re-register with the Master after job completion — similar in model to Nomad for mixed batch + service workloads.
+
 3. **Level 3: Agentic Execution Runtime (Autonomous Mode)**
-   * Infrastructure-aware substrate where software agents programmatically spawn compute tasks based on LLM decisions.
+   Infrastructure-aware substrate where software agents programmatically spawn compute tasks based on LLM decisions.
 
 ---
 
@@ -64,18 +85,34 @@ Titan scales with your complexity, from a simple script runner to an autonomous 
 ### 1. Universal Workload Support
 Orchestrate ephemeral scripts, long-running services, and hybrid DAGs (e.g., Python script → Java Service → Shell cleanup) in a single zero-dependency binary.
 
-### 2. Smart Resource Governance
-* **Permanent vs. Ephemeral Nodes:** Protect core infrastructure while allowing burst workers to decommission automatically after 45s of idle time.
-* **Capability Routing:** Tag workers with skills (e.g., `GPU`). Titan ensures hardware-heavy tasks land only on capable nodes.
+### 2. Visual DAG Constructor
+Build and deploy pipelines without writing code. Drag nodes, draw edges, configure jobs, and hit Deploy — the Constructor submits directly to the master and opens the live visualizer. HITL gates, GPU routing, sticky scheduling, and priority are all configurable from the UI.
 
-### 3. High-Performance Internals
-* **TITAN_PROTO:** Custom binary TCP wire format for <50ms latency without JSON overhead.
-* **Inception Scaling:** Saturated workers can autonomously spawn "child" worker processes to handle traffic spikes.
-* **Least-Connection Routing:** Master intelligently routes jobs to the node with the lowest active thread load.
+### 3. Human-in-the-Loop (HITL) Gates
+Pause a DAG at any checkpoint and wait for a human Approve/Reject before downstream jobs run. Gate injection is automatic — set a message in the Constructor or SDK and the server injects the gate job. Configurable timeout (default 48 hours). Approve/Reject from the DAG Pipelines dashboard.
 
-### 4. Self-Healing Resilience
-* **Zombie Process Reaping:** Workers automatically clean up orphaned PIDs from previous crashes upon startup.
-* **TitanStore (AOF):** Built-in Redis-like persistence. If the Master dies, it replays the Append-Only File to reconstruct the cluster state perfectly.
+### 4. Capability-Aware Routing
+- **Permanent vs. Ephemeral Workers** — mark core nodes as permanent so they stay alive; burst workers decommission automatically after 45s of idle time
+- **Hardware Routing** — tag workers with `GPU` or `HIGH_MEM`; jobs with a matching requirement are held until a capable node is free
+
+### 5. Scaling & Dispatch
+- **Process-Level Auto-Scaling** — when a worker's queue saturates, it can spawn child worker processes on the same machine to absorb the spike
+- **Least-Connection Routing** — new jobs go to the worker with the lowest active thread count
+- **Custom TCP Protocol (TITAN_PROTO)** — fixed-header binary framing over raw TCP; no JSON serialization overhead on the dispatch path
+
+### 6. Failure Handling
+- **Crash Recovery (AOF)** — TitanStore writes every state transition to an append-only file; if the Master restarts, it replays the file and resumes in-flight DAGs where they left off
+- **Worker Re-registration** — workers re-register with the Master every 30 seconds; the cluster recovers through a Master restart without manual intervention
+- **Orphan Cleanup** — on startup, workers scan for and kill leftover processes from a previous crash before accepting new work
+- **Callback Retry** — job completion callbacks retry with exponential backoff (up to 5 attempts) to handle transient network issues
+
+---
+
+## Architecture
+
+<p align="center">
+  <img src="./screenshots/Titan_L1_diagram_final.png" alt="Titan High Level Architecture" width="800"/>
+</p>
 
 ---
 
@@ -86,15 +123,15 @@ Orchestrate ephemeral scripts, long-running services, and hybrid DAGs (e.g., Pyt
 
 https://github.com/user-attachments/assets/5731c0b8-d392-4890-a3c5-f7e9cf611d65
 
-### 2. Elasticity: Reactive Auto-Scaling
-*Watch the cluster detect load, spawn a new Worker process automatically, and distribute tasks.*
+### 2. Reactive Worker Scaling
+*Watch the cluster detect load, spawn an additional Worker process on the same host, and distribute tasks across it.*
 
 https://github.com/user-attachments/assets/3f7d41df-654a-45d9-a49e-85978fad9172
 
 <details>
-  <summary><b>🎬 View More Scenarios (GPU Routing, Fanout, Full Scale Cycle)</b></summary>
+  <summary><b>View More Scenarios (GPU Routing, Fanout, Full Scale Cycle)</b></summary>
   <br>
-  
+
   **GPU Affinity Routing**
   <video src="https://github.com/user-attachments/assets/9a1abc1c-d01f-4998-8c74-30409113ec85" controls="controls" style="max-width: 100%;"></video>
 
@@ -107,9 +144,51 @@ https://github.com/user-attachments/assets/3f7d41df-654a-45d9-a49e-85978fad9172
 
 ---
 
-## License & Attribution
+## Quick Start
 
-Titan Orchestrator is licensed under the Apache License 2.0.
-© 2026 **Ram Narayanan A S**. Open for contributions.
+```bash
+# 1. Build the engine
+mvn clean package -DskipTests
+
+# 2. Start the cluster
+./titan-dev.sh up
+
+# 3. Open the dashboard
+open http://localhost:5000
+```
+
+Full guide: **[5-Minute Quickstart](https://ramn51.github.io/titan-orchestrator/getting-started/)**
+
+---
+
+## Cloud Deployment
+
+Titan runs locally out of the box. When you're ready to move to the cloud, `package_cloud.sh` builds two deployment bundles from your local build:
+
+```bash
+./package_cloud.sh
+# → titan-master-bundle.zip  (~2.3 MB) — everything needed on the Master VM
+# → titan-worker-bundle.zip  (~120 KB) — Worker.jar + titan_sdk for remote workers
+```
+
+Two patterns are documented:
+
+- **[Multi-VM Setup](https://ramn51.github.io/titan-orchestrator/deployment/cloud/)** — permanent cluster on GCP / AWS / Azure with open ports
+- **[Remote GPU via SSH Tunnel](https://ramn51.github.io/titan-orchestrator/deployment/remote-gpu-worker/)** — keep your local machine as the Master, tunnel a RunPod or cloud GPU as a worker with no firewall changes
+
+---
+
+## Contributing
+
+Titan is an experimental runtime engineered from first principles by a single developer. Bug reports, edge case findings, and contributions are highly encouraged.
+
+[Report an Issue](https://github.com/ramn51/titan-orchestrator/issues) · [How to Contribute](https://ramn51.github.io/titan-orchestrator/contributing/)
+
+---
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE).
+© 2026 **Ram Narayanan A S**.
 
 *Engineered from first principles to deconstruct the fundamental primitives of distributed orchestration.*

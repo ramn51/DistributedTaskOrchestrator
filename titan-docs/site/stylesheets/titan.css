@@ -1,0 +1,114 @@
+/* ─────────────────────────────────────────────────────────────
+   Titan Orchestrator — Custom Theme Overrides
+   Targets: slate (dark) scheme only unless noted
+   ───────────────────────────────────────────────────────────── */
+
+/* ── 1. Darker overall background ───────────────────────────── */
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color:        #0d1117;   /* main content area — near-black */
+  --md-default-fg-color:        #e6edf3;   /* body text */
+  --md-default-fg-color--light: #8b949e;   /* muted text */
+  --md-code-bg-color:           #161b22;   /* code blocks */
+  --md-footer-bg-color:         #010409;
+}
+
+/* ── 2. Darker green primary (replaces "light green") ────────── */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color:        #1a7a3c;   /* header bar, active accents */
+  --md-primary-fg-color--light: #238a47;
+  --md-primary-fg-color--dark:  #145e2e;
+  --md-primary-bg-color:        #ffffff;   /* text on primary bg */
+  --md-accent-fg-color:         #2ea04b;   /* hover / active links */
+}
+
+/* ── 3. Header bar — darker green ───────────────────────────── */
+[data-md-color-scheme="slate"] .md-header {
+  background-color: #0f3d20;
+}
+
+[data-md-color-scheme="slate"] .md-tabs {
+  background-color: #0d3419;
+}
+
+/* ── 4. Sidebar — slightly lighter than page so it reads ─────── */
+[data-md-color-scheme="slate"] .md-sidebar {
+  background-color: #111820;
+}
+
+/* ── 5. Nav section labels — unselected items more visible ───── */
+[data-md-color-scheme="slate"] .md-nav__item .md-nav__link {
+  color: #9db4c8;           /* brighter than default muted grey */
+}
+
+[data-md-color-scheme="slate"] .md-nav__item .md-nav__link:hover {
+  color: #e6edf3;
+}
+
+/* Active / selected nav item */
+[data-md-color-scheme="slate"] .md-nav__item--active > .md-nav__link {
+  color: #2ea04b;
+  font-weight: 600;
+}
+
+/* ── 6. Top-level nav section titles (e.g. "Architecture") ───── */
+[data-md-color-scheme="slate"] .md-nav__item--section > .md-nav__link {
+  color: #b8cfe0;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+}
+
+/* ── 7. Expand arrow — show there are subsections below ──────── */
+[data-md-color-scheme="slate"] .md-nav__item--nested > .md-nav__link::after {
+  opacity: 0.85;
+}
+
+/* Force section toggle arrows to be visible even when collapsed */
+[data-md-color-scheme="slate"] .md-nav__toggle ~ .md-nav__link .md-nav__icon {
+  color: #4a7c6b;
+}
+
+[data-md-color-scheme="slate"] .md-nav__toggle:checked ~ .md-nav__link .md-nav__icon {
+  color: #2ea04b;
+}
+
+/* ── 8. Contributing section — ensure it shows after Architecture */
+[data-md-color-scheme="slate"] .md-nav__list > .md-nav__item:last-child {
+  border-bottom: none;
+  padding-bottom: 1rem;
+}
+
+/* Subtle divider between top-level nav sections */
+[data-md-color-scheme="slate"] .md-nav--secondary .md-nav__list,
+[data-md-color-scheme="slate"] .md-nav__list > .md-nav__item--section {
+  border-top: 1px solid #1e2d3d;
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+}
+
+/* ── 9. Content area — slightly off-black for contrast ─────── */
+[data-md-color-scheme="slate"] .md-content {
+  background-color: #0d1117;
+}
+
+[data-md-color-scheme="slate"] .md-typeset h1,
+[data-md-color-scheme="slate"] .md-typeset h2,
+[data-md-color-scheme="slate"] .md-typeset h3 {
+  color: #e6edf3;
+}
+
+/* ── 10. Tables — visible borders in dark mode ──────────────── */
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
+  background-color: #161b22;
+  color: #e6edf3;
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) td,
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
+  border-color: #21262d;
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) tr:hover {
+  background-color: #161b22;
+}

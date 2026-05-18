@@ -18,8 +18,8 @@ import zipfile
 import json as _json
 
 # --- CONFIGURATION ---
-TITAN_HOST = "127.0.0.1"
-TITAN_PORT = 9090
+TITAN_HOST = os.environ.get("TITAN_HOST", "127.0.0.1")
+TITAN_PORT = int(os.environ.get("TITAN_PORT", 9090))
 VERSION = 1
 OP_SUBMIT_DAG = 4
 OP_LOG_BATCH = 0x17
@@ -230,8 +230,21 @@ class TitanClient:
                     existing[f"__job_payload__DAG-{job_key}"] = replay_str
             with open(manifest_path, 'w') as f:
                 _json.dump(existing, f, indent=2)
+            self._push_manifest(existing)
         except Exception:
             pass
+
+    def _push_manifest(self, manifest_data):
+        """Pushes the manifest to the remote dashboard so it can group pipelines correctly."""
+        import urllib.request as _urllib
+        dashboard_port = int(os.environ.get("TITAN_DASHBOARD_PORT", 5000))
+        url = f"http://{TITAN_HOST}:{dashboard_port}/api/manifest/sync"
+        try:
+            body = _json.dumps(manifest_data).encode("utf-8")
+            req = _urllib.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
+            _urllib.urlopen(req, timeout=5)
+        except Exception:
+            pass  # Dashboard may not be running — non-fatal
 
     def submit_job(self, job):
         return self.submit_dag(job.id, [job])

@@ -1,0 +1,56 @@
+title: "[Show] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Built something with Titan? Share it here — pipelines, agents, integrations, experiments.
+        No polish required. A quick description and a code snippet or screenshot is enough.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What did you build?
+      description: Brief description of the pipeline, agent, or integration.
+      placeholder: "A multi-agent research pipeline that fans out to 8 analyst workers, runs a HITL approval gate, then synthesizes a report using Gemini..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      options:
+        - Pipeline (batch / ETL)
+        - Agentic workflow
+        - GPU / ML workload
+        - Service orchestration
+        - Integration with another tool
+        - Experiment / research
+        - Other
+    validations:
+      required: false
+
+  - type: textarea
+    id: setup
+    attributes:
+      label: Setup
+      description: How was your cluster configured? Local, cloud VM, remote GPU?
+    validations:
+      required: false
+
+  - type: textarea
+    id: snippet
+    attributes:
+      label: Code snippet or pipeline structure
+      render: python
+    validations:
+      required: false
+
+  - type: textarea
+    id: learnings
+    attributes:
+      label: Anything interesting you ran into?
+      description: Edge cases, workarounds, things that surprised you — useful for others.
+    validations:
+      required: false

@@ -27,8 +27,9 @@ theme:
   features:
     - navigation.tabs
     - navigation.sections
-    - navigation.top        
-    - content.code.copy     
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
     - content.code.annotate
 # theme:
 #   name: material
@@ -38,6 +39,9 @@ theme:
 #     accent: teal
 #   features:
 #     - navigation.tabs # Puts top-level items in a top navbar
+
+extra_css:
+  - stylesheets/titan.css
 
 markdown_extensions:
   - admonition
@@ -64,6 +68,9 @@ markdown_extensions:
 nav:
   - 🏠 Home: index.md
   - 🚀 Getting Started: getting-started.md
+  - ☁️ Cloud Deployment:
+      - Multi-VM Setup: deployment/cloud.md
+      - Remote GPU Worker (SSH Tunnel): deployment/remote-gpu-worker.md
   - 💡 Examples:
       - Overview: examples/agentic.md
       - Pipelines:
@@ -76,6 +83,8 @@ nav:
           - Code Generation Agent: examples/code-gen-agent.md
           - Human-in-the-Loop (HITL): examples/hitl.md
           - Multi-Agent Research Pipeline: examples/research-pipeline.md
+      - Advanced:
+          - Titan CI Pipeline (Dogfooding): examples/titan-ci.md
   - 🛠️ DAG Constructor:
       - Overview: constructor/overview.md
       - Building DAGs: constructor/building-dags.md
@@ -95,6 +104,8 @@ nav:
       - Java Engine API: javadocs/docs/index.html
       - Titan CLI: reference/cli.md
       - Titan RPC Spec: reference/rpc-spec.md
+
+  - ⚖️ How Titan Compares: comparison.md
 
   - 🧠 Architecture Deep Dive:
       - System Design: architecture/design.md

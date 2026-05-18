@@ -38,7 +38,6 @@ chmod +x titan-dev
 
 [OK] Engine JAR found.
 [SETUP] Verifying Python SDK...
-^CERROR: Operation cancelled by user
 [OK] Python SDK ready.
 [START] Starting TitanStore (Port 6379)...
 [START] Starting Titan Master (Port 9090)...
@@ -118,7 +117,7 @@ Once a DAG has been submitted — via the CLI, Python SDK, YAML, or the Construc
 
 This works for any submission method. YAML and SDK-based pipelines are represented accurately with full structure. Dynamic DAGs are visualized based on the graph submitted to the Master at runtime. Agentic DAGs will appear and grow as the agent submits new work — the full graph may not be known upfront, but everything submitted will be visible.
 
-![DAG Visualizer](screenshots/DAG_Visualizer_.png)
+![DAG Visualizer](screenshots/visualizer_overview.png)
 
 ### Visual DAG Constructor
 
@@ -138,7 +137,7 @@ The Constructor also auto-generates the equivalent **Python SDK** and **YAML** c
 
 ## 5. Advanced: Manual & IDE Setup
 
-### Option 5: Run via IntelliJ (Recommended for Dev)
+### Option A: Run via IntelliJ (Recommended for Dev)
 
 If you are developing Titan, simply open the project in IntelliJ IDEA and run the Main classes directly:
 
@@ -146,17 +145,17 @@ If you are developing Titan, simply open the project in IntelliJ IDEA and run th
 2. **Worker:** Run `titan.TitanWorker` (Defaults to Port 8080, Capability: GENERAL, Permanent: False)
 3. **CLI:** Run `titan.TitanCli`
 
-### Option 5.1. Build the core engine
+### Option B: Build and run manually
 ```bash
 mvn clean package
 ```
 
-### 5.2 Stage the binary for execution (Optional, there will be a Worker.jar already there)
+### B.2 Stage the binary for execution (Optional)
 ```bash
 cp target/titan-orchestrator-1.0-SNAPSHOT.jar perm_files/Worker.jar
 ```
 
-### 5.3 Configure the Runtime (titan.properties)
+### B.3 Configure the Runtime (titan.properties)
 
 Titan uses an Adapter Pattern for its state management, meaning the persistence layer is entirely pluggable. To connect the Master to your Redis (TitanStore) instance for state recovery and data-bus features, create a titan.properties file in the root directory where you run the JAR.
 
@@ -197,9 +196,7 @@ Received: [SET, worker:127.0.0.1:8080:load, 0]
 DEBUG STORAGE: Putting worker:127.0.0.1:8080:load with ttl -1
 ```
 
-### Start the Cluster
-
-### 5.4 Start TitanMaster and TitanWorker
+### B.4 Start TitanMaster and TitanWorker
 
 
 **Terminal 1 (The Master Scheduler):**
@@ -295,7 +292,7 @@ Worker Server started on port 8081
 
 ---
 
-### 5.6 Install the Python SDK
+### B.5 Install the Python SDK
 
 The Titan Python SDK allows you to submit jobs, define DAGs, and interact with the cluster programmatically.
 
@@ -324,18 +321,6 @@ python titan_sdk/titan_cli.py deploy titan_test_suite/examples/yaml_based_static
 
 ---
 
-## 7. Open the Dashboard (Optional)
-
-Titan includes a lightweight Flask dashboard to visualize cluster health and stream live logs. To spin it up, run:
-
-```bash
-python3 ./perm_files/server_dashboard.py
-```
-
-Navigate to **`http://localhost:5000`** in your browser to see your Worker node's live CPU/Thread load and the history of the DAG you just ran.
-
-To build and deploy a DAG visually, open **`http://localhost:5000/dags/new`**. See [Step 4](#4-open-the-dashboard) above for full instructions.
-
-> This is an external dependency and you will need to install Flask alone for this to work. This is not part of the engine and is an extension so its an external dependency.
+> **Note on the dashboard:** If you're running the manual setup (not `titan-dev`), start the dashboard with `python3 ./perm_files/server_dashboard.py`. Flask is required (`pip install flask`). See [Step 4](#4-open-the-dashboard) for the full walkthrough.
 
 
